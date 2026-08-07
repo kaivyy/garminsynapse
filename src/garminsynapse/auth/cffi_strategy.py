@@ -1,0 +1,29 @@
+"""Cffi Strategy adapting python-garminconnect's 5-stage login engine."""
+import logging
+from typing import Dict, Any, Optional
+from garminconnect import Garmin
+
+logger = logging.getLogger(__name__)
+
+
+class CffiStrategy:
+    """Uses python-garminconnect's multi-stage browser impersonation login engine."""
+
+    def __init__(self, domain: str = "garmin.com"):
+        self.domain = domain
+
+    def login(self, email: str, password: str, prompt_mfa=None) -> Dict[str, Any]:
+        logger.info(f"Authenticating Garmin Connect for {email}...")
+        garmin = Garmin(email=email, password=password, prompt_mfa=prompt_mfa)
+        garmin.login()
+
+        client_obj = getattr(garmin, "client", None)
+        headers = dict(client_obj.session.headers) if (client_obj and hasattr(client_obj, "session")) else {}
+
+        tokens = {
+            "email": email,
+            "user_id": getattr(garmin, "display_name", None) or getattr(garmin, "username", None),
+            "headers": headers,
+            "source": "cffi_strategy"
+        }
+        return tokens

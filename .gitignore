@@ -1,0 +1,48 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases and downloaded files
+*.db
+garmin_data.db
+garmin_files/
+tokens.json
+
+# Environment variables & secrets
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Playwright cache
+.cache/

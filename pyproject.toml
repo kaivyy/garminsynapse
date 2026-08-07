@@ -1,0 +1,15 @@
+[project]
+name = "garminsynapse"
+version = "0.1.0"
+description = "Garmin Synapse"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "curl_cffi",
+    "sqlalchemy",
+    "mcp",
+    "playwright",
+    "fitdecode",
+    "defusedxml",
+    "pytest"
+]

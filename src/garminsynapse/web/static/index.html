@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garmin Synapse - Health & MCP Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="background-glow"></div>
+    
+    <!-- Login Modal / Screen -->
+    <div id="login-modal" class="modal-backdrop">
+        <div class="glass modal-card">
+            <div class="modal-header">
+                <span class="logo-icon">⚡</span>
+                <h2>Login to Garmin Connect</h2>
+                <p class="modal-subtext">Authenticate using fast 5-stage curl_cffi or Playwright browser fallback.</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="email">Garmin Email</label>
+                    <input type="email" id="email" required placeholder="user@example.com" class="input-field">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required placeholder="••••••••" class="input-field">
+                </div>
+                <div id="login-error" class="error-msg hidden"></div>
+                <button type="submit" id="login-btn" class="btn primary-btn full-width">
+                    <span id="login-btn-text">Authenticate & Extract Data</span>
+                    <span id="login-spinner" class="spinner hidden"></span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Container -->
+    <div class="app-container hidden" id="dashboard-container">
+        <header class="navbar glass">
+            <div class="brand">
+                <span class="logo-icon">⚡</span>
+                <div class="brand-text">
+                    <h1>Garmin Synapse</h1>
+                    <span class="sub-text">Unified Engine & MCP Server</span>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="mcp-pill active" id="mcp-status">
+                    <span class="status-dot"></span>
+                    <span class="status-label">MCP: Online</span>
+                </div>
+                <button id="sync-btn" class="btn secondary-btn">
+                    <span class="btn-icon">🔄</span> Sync
+                </button>
+                <button id="logout-btn" class="btn danger-btn">
+                    Logout
+                </button>
+            </div>
+        </header>
+        
+        <main class="content-grid">
+            <!-- Health Overview Gauges -->
+            <section class="overview-section">
+                <h2 class="section-title">Today's Health Summary</h2>
+                <div class="dashboard-cards">
+                    <div class="card glass">
+                        <div class="card-header">
+                            <span class="card-icon">🏃‍♂️</span>
+                            <span class="card-title">Daily Steps</span>
+                        </div>
+                        <div class="metric-value" id="steps-value">--</div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="steps-bar" style="width: 0%;"></div>
+                        </div>
+                        <span class="metric-subtext">Goal: 10,000 steps</span>
+                    </div>
+
+                    <div class="card glass">
+                        <div class="card-header">
+                            <span class="card-icon">❤️</span>
+                            <span class="card-title">Resting Heart Rate</span>
+                        </div>
+                        <div class="metric-value" id="hr-value">-- <span class="unit">bpm</span></div>
+                        <span class="metric-subtext green-text">✓ Optimal Recovery</span>
+                    </div>
+
+                    <div class="card glass">
+                        <div class="card-header">
+                            <span class="card-icon">😴</span>
+                            <span class="card-title">Sleep Score</span>
+                        </div>
+                        <div class="metric-value" id="sleep-score">-- <span class="unit">/ 100</span></div>
+                        <span class="metric-subtext purple-text">Restorative Sleep</span>
+                    </div>
+
+                    <div class="card glass">
+                        <div class="card-header">
+                            <span class="card-icon">🔋</span>
+                            <span class="card-title">Body Battery</span>
+                        </div>
+                        <div class="metric-value" id="battery-value">-- <span class="unit">%</span></div>
+                        <span class="metric-subtext cyan-text">Current Energy</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Activities Feed Section -->
+            <section class="activities-section">
+                <div class="section-header">
+                    <h2 class="section-title">Recent Activities</h2>
+                    <span class="badge" id="activity-count">Loading...</span>
+                </div>
+                <div class="table-container glass">
+                    <table class="activities-table">
+                        <thead>
+                            <tr>
+                                <th>Activity Name</th>
+                                <th>Type</th>
+                                <th>Duration</th>
+                                <th>Distance</th>
+                                <th>Avg HR</th>
+                                <th>Calories</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activity-table-body">
+                            <!-- Populated dynamically by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="/js/app.js"></script>
+</body>
+</html>
