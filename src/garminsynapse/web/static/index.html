@@ -38,6 +38,45 @@
         </div>
     </div>
 
+    <!-- Activity Details Modal -->
+    <div id="activity-modal" class="modal-backdrop hidden">
+        <div class="glass modal-card detail-modal">
+            <div class="modal-header flex-between">
+                <div>
+                    <h2 id="modal-act-name">Workout Details</h2>
+                    <span id="modal-act-type" class="badge">Activity</span>
+                </div>
+                <button id="close-act-modal" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Start Time</span>
+                    <span class="detail-val" id="modal-act-time">--</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Duration</span>
+                    <span class="detail-val" id="modal-act-duration">--</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Distance</span>
+                    <span class="detail-val" id="modal-act-distance">--</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Avg Heart Rate</span>
+                    <span class="detail-val" id="modal-act-avghr">--</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Max Heart Rate</span>
+                    <span class="detail-val" id="modal-act-maxhr">--</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Calories Burned</span>
+                    <span class="detail-val" id="modal-act-calories">--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Dashboard Container -->
     <div class="app-container hidden" id="dashboard-container">
         <header class="navbar glass">
@@ -65,8 +104,9 @@
         <main class="content-grid">
             <!-- Health Overview Gauges -->
             <section class="overview-section">
-                <h2 class="section-title">Today's Health Summary</h2>
+                <h2 class="section-title">Health & Biometric Overview</h2>
                 <div class="dashboard-cards">
+                    <!-- Daily Steps -->
                     <div class="card glass">
                         <div class="card-header">
                             <span class="card-icon">🏃‍♂️</span>
@@ -79,15 +119,17 @@
                         <span class="metric-subtext">Goal: 10,000 steps</span>
                     </div>
 
+                    <!-- Resting HR -->
                     <div class="card glass">
                         <div class="card-header">
                             <span class="card-icon">❤️</span>
                             <span class="card-title">Resting Heart Rate</span>
                         </div>
                         <div class="metric-value" id="hr-value">-- <span class="unit">bpm</span></div>
-                        <span class="metric-subtext green-text">✓ Optimal Recovery</span>
+                        <span class="metric-subtext green-text">✓ Heart Health</span>
                     </div>
 
+                    <!-- Sleep Score -->
                     <div class="card glass">
                         <div class="card-header">
                             <span class="card-icon">😴</span>
@@ -97,13 +139,54 @@
                         <span class="metric-subtext purple-text">Restorative Sleep</span>
                     </div>
 
+                    <!-- Body Battery -->
                     <div class="card glass">
                         <div class="card-header">
                             <span class="card-icon">🔋</span>
                             <span class="card-title">Body Battery</span>
                         </div>
                         <div class="metric-value" id="battery-value">-- <span class="unit">%</span></div>
-                        <span class="metric-subtext cyan-text">Current Energy</span>
+                        <span class="metric-subtext cyan-text">Energy Level</span>
+                    </div>
+
+                    <!-- HRV Baseline -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <span class="card-icon">📈</span>
+                            <span class="card-title">HRV Status</span>
+                        </div>
+                        <div class="metric-value" id="hrv-value">-- <span class="unit">ms</span></div>
+                        <span class="metric-subtext cyan-text">7-Day Baseline</span>
+                    </div>
+
+                    <!-- Stress Score -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <span class="card-icon">🧘</span>
+                            <span class="card-title">Stress Level</span>
+                        </div>
+                        <div class="metric-value" id="stress-value">-- <span class="unit">/ 100</span></div>
+                        <span class="metric-subtext green-text">Daily Recovery</span>
+                    </div>
+
+                    <!-- Respiration Rate -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <span class="card-icon">🫁</span>
+                            <span class="card-title">Respiration</span>
+                        </div>
+                        <div class="metric-value" id="resp-value">-- <span class="unit">brpm</span></div>
+                        <span class="metric-subtext purple-text">Breath Rate</span>
+                    </div>
+
+                    <!-- Pulse Ox / SpO2 -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <span class="card-icon">🩸</span>
+                            <span class="card-title">Pulse Ox (SpO2)</span>
+                        </div>
+                        <div class="metric-value" id="spo2-value">-- <span class="unit">%</span></div>
+                        <span class="metric-subtext green-text">Blood Oxygen</span>
                     </div>
                 </div>
             </section>
@@ -111,7 +194,7 @@
             <!-- Activities Feed Section -->
             <section class="activities-section">
                 <div class="section-header">
-                    <h2 class="section-title">Recent Activities</h2>
+                    <h2 class="section-title">Recent Workouts & Activities</h2>
                     <span class="badge" id="activity-count">Loading...</span>
                 </div>
                 <div class="table-container glass">
@@ -120,6 +203,7 @@
                             <tr>
                                 <th>Activity Name</th>
                                 <th>Type</th>
+                                <th>Date & Time</th>
                                 <th>Duration</th>
                                 <th>Distance</th>
                                 <th>Avg HR</th>

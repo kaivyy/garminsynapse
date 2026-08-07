@@ -46,6 +46,25 @@ body {
     display: none !important;
 }
 
+.flex-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
+}
+
 /* Modal Styles */
 .modal-backdrop {
     position: fixed;
@@ -67,6 +86,39 @@ body {
     max-width: 440px;
     padding: 32px;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.detail-modal {
+    max-width: 520px;
+}
+
+.modal-body-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+    text-align: left;
+}
+
+.detail-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+}
+
+.detail-label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.detail-val {
+    font-family: var(--font-heading);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
 .modal-header {
@@ -383,8 +435,12 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
+.activities-table tr {
+    cursor: pointer;
+}
+
 .activities-table tr:hover td {
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.04);
 }
 
 /* Responsive Breakpoints */

@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from garminsynapse.auth.manager import DualAuthManager
 from garminsynapse.db.manager import DatabaseManager
-from garminsynapse.db.schema import Activity, Sleep
+from garminsynapse.db.schema import Activity, Sleep, HRV, Stress, BodyBattery, UserProfile
 from garminsynapse.etl.extractor import GarminExtractor
 
 logger = logging.getLogger(__name__)
@@ -65,24 +65,42 @@ def logout():
 
 @router.get("/summary")
 def summary():
-    """Daily health metrics summary from SQLite database."""
+    """Complete health and training metrics summary from SQLite database."""
     auth_mgr = DualAuthManager()
     if not auth_mgr.get_active_tokens():
         return JSONResponse({"error": "unauthenticated"}, status_code=401)
 
     db = DatabaseManager()
     session = db.get_session()
+    
     steps = 0
     resting_hr = None
     sleep_score = None
     body_battery = None
+    hrv_status = None
+    stress_level = None
+    respiration_rate = None
+    spo2 = None
+    vo2_max = None
 
     try:
         sleep_rec = session.query(Sleep).order_by(Sleep.sleep_id.desc()).first()
         if sleep_rec and sleep_rec.sleep_score:
             sleep_score = sleep_rec.sleep_score
-    except Exception:
-        pass
+            
+        hrv_rec = session.query(HRV).order_by(HRV.calendar_date.desc()).first()
+        if hrv_rec:
+            hrv_status = hrv_rec.weekly_avg
+            
+        stress_rec = session.query(Stress).order_by(Stress.calendar_date.desc()).first()
+        if stress_rec:
+            stress_level = stress_rec.average_stress_level
+            
+        battery_rec = session.query(BodyBattery).order_by(BodyBattery.calendar_date.desc()).first()
+        if battery_rec:
+            body_battery = battery_rec.charged_value
+    except Exception as e:
+        logger.debug(f"Error querying summary metrics: {e}")
     finally:
         session.close()
 
@@ -90,7 +108,12 @@ def summary():
         "steps": steps,
         "resting_hr": resting_hr,
         "sleep_score": sleep_score,
-        "body_battery": body_battery
+        "body_battery": body_battery,
+        "hrv_status": hrv_status,
+        "stress_level": stress_level,
+        "respiration_rate": respiration_rate,
+        "spo2": spo2,
+        "vo2_max": vo2_max
     })
 
 
@@ -105,15 +128,17 @@ def activities():
     session = db.get_session()
     result = []
     try:
-        recs = session.query(Activity).order_by(Activity.start_ts.desc()).limit(15).all()
+        recs = session.query(Activity).order_by(Activity.start_ts.desc()).limit(20).all()
         for r in recs:
             result.append({
                 "id": str(r.activity_id),
                 "name": r.activity_name,
                 "type": r.activity_type_key,
+                "start_ts": str(r.start_ts),
                 "duration": f"{int((r.duration or 0) / 60)} min",
                 "distance": f"{(r.distance or 0) / 1000:.2f}",
                 "avg_hr": r.average_hr,
+                "max_hr": r.max_hr,
                 "calories": r.calories
             })
     except Exception as e:
@@ -122,6 +147,36 @@ def activities():
         session.close()
 
     return JSONResponse(result)
+
+
+@router.get("/activity/{activity_id}")
+def activity_details(activity_id: int):
+    """Fetch details of a single activity."""
+    auth_mgr = DualAuthManager()
+    if not auth_mgr.get_active_tokens():
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+
+    db = DatabaseManager()
+    session = db.get_session()
+    try:
+        act = session.query(Activity).filter_by(activity_id=activity_id).first()
+        if not act:
+            raise HTTPException(status_code=404, detail="Activity not found.")
+        return JSONResponse({
+            "id": str(act.activity_id),
+            "name": act.activity_name,
+            "type": act.activity_type_key,
+            "start_ts": str(act.start_ts),
+            "duration_sec": act.duration,
+            "distance_m": act.distance,
+            "avg_hr": act.average_hr,
+            "max_hr": act.max_hr,
+            "calories": act.calories,
+            "elapsed_duration": act.elapsed_duration,
+            "elevation_gain": act.elevation_gain
+        })
+    finally:
+        session.close()
 
 
 @router.post("/sync")
