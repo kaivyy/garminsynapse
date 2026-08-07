@@ -10,6 +10,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const syncBtn = document.getElementById('sync-btn');
     const closeActModal = document.getElementById('close-act-modal');
 
+    // Theme Toggle
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIconSun = document.getElementById('theme-icon-sun');
+    const themeIconMoon = document.getElementById('theme-icon-moon');
+
     // Date Filter Controls
     const startDateInput = document.getElementById('start-date-input');
     const endDateInput = document.getElementById('end-date-input');
@@ -43,11 +48,43 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentStartDate = '';
     let currentEndDate = '';
 
+    // ============================================================
+    // Theme Toggle Logic
+    // ============================================================
+    function getStoredTheme() {
+        return localStorage.getItem('garminsynapse-theme') || 'dark';
+    }
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('garminsynapse-theme', theme);
+        if (theme === 'dark') {
+            themeIconSun.classList.remove('hidden');
+            themeIconMoon.classList.add('hidden');
+        } else {
+            themeIconSun.classList.add('hidden');
+            themeIconMoon.classList.remove('hidden');
+        }
+    }
+    // Initialize theme
+    setTheme(getStoredTheme());
+
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            setTheme(current === 'dark' ? 'light' : 'dark');
+        });
+    }
+
+    // ============================================================
+    // Helper
+    // ============================================================
     function formatDate(d) {
         return d.toISOString().split('T')[0];
     }
 
-    // Check System & Auth Status
+    // ============================================================
+    // Auth Status Check
+    // ============================================================
     async function checkAuthStatus() {
         try {
             const res = await fetch('/api/v1/status');
@@ -78,13 +115,24 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardContainer.classList.remove('hidden');
     }
 
+    // ============================================================
+    // Activity Detail Modal
+    // ============================================================
     if (closeActModal) {
         closeActModal.addEventListener('click', () => {
             activityModal.classList.add('hidden');
         });
     }
+    // Close modal on backdrop click
+    if (activityModal) {
+        activityModal.addEventListener('click', (e) => {
+            if (e.target === activityModal) activityModal.classList.add('hidden');
+        });
+    }
 
-    // Handle Preset Clicks
+    // ============================================================
+    // Date Range Presets
+    // ============================================================
     presetBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             presetBtns.forEach(b => b.classList.remove('active'));
@@ -127,7 +175,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Handle Login Form Submission
+    // ============================================================
+    // Login Form
+    // ============================================================
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('email').value.trim();
@@ -157,12 +207,14 @@ document.addEventListener('DOMContentLoaded', () => {
             loginError.textContent = 'Connection error. Please try again.';
             loginError.classList.remove('hidden');
         } finally {
-            loginBtnText.textContent = 'Authenticate & Extract Data';
+            loginBtnText.textContent = 'Authenticate & Sync';
             loginSpinner.classList.add('hidden');
         }
     });
 
-    // Handle Logout
+    // ============================================================
+    // Logout
+    // ============================================================
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
             await fetch('/api/v1/auth/logout', { method: 'POST' });
@@ -170,7 +222,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Load Dashboard Real Data
+    // ============================================================
+    // Dashboard Data Loader
+    // ============================================================
     async function loadDashboardData(startDate = '', endDate = '') {
         try {
             let summaryUrl = '/api/v1/summary';
@@ -222,11 +276,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const actRes = await fetch(actUrl);
             if (actRes.ok) {
                 const activities = await actRes.json();
-                activityCount.textContent = `${activities.length} workouts logged`;
+                activityCount.textContent = `${activities.length} workouts`;
                 activityTableBody.innerHTML = '';
 
                 if (activities.length === 0) {
-                    activityTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:30px;">No device connected / No workouts logged for selected range.</td></tr>`;
+                    activityTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:40px; font-size:14px;">No device connected — No workouts logged for the selected range.</td></tr>`;
                     return;
                 }
 
@@ -251,6 +305,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ============================================================
+    // Activity Detail Modal Opener
+    // ============================================================
     async function openActivityModal(activityId) {
         try {
             const res = await fetch(`/api/v1/activity/${activityId}`);
@@ -271,11 +328,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Handle Manual Sync Button
+    // ============================================================
+    // Manual Sync
+    // ============================================================
     if (syncBtn) {
         syncBtn.addEventListener('click', async () => {
             syncBtn.disabled = true;
-            syncBtn.innerHTML = '🔄 Syncing...';
+            syncBtn.querySelector('span').textContent = 'Syncing...';
             try {
                 await fetch('/api/v1/sync', { method: 'POST' });
                 await loadDashboardData(currentStartDate, currentEndDate);
@@ -283,11 +342,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Sync failed:', err);
             } finally {
                 syncBtn.disabled = false;
-                syncBtn.innerHTML = '<span class="btn-icon">🔄</span> Sync';
+                syncBtn.querySelector('span').textContent = 'Sync';
             }
         });
     }
 
-    // Check status on load
+    // ============================================================
+    // Init
+    // ============================================================
     checkAuthStatus();
 });
