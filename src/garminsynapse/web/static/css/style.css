@@ -765,17 +765,112 @@ h1, h2, h3 { font-family: var(--font-heading); letter-spacing: -0.5px; }
 @media (max-width: 1024px) {
     .dashboard-cards { grid-template-columns: repeat(2, 1fr); }
 }
+
 @media (max-width: 768px) {
-    .app-container { padding: 16px; }
+    .app-container { padding: 12px; }
+
+    /* --- Navbar: brand left, controls right, single row --- */
     .navbar {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 14px;
-        padding: 16px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        gap: 8px;
     }
-    .header-controls { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
-    .date-filter-bar { flex-direction: column; align-items: flex-start; }
-    .dashboard-cards { grid-template-columns: 1fr; }
-    .metric-value { font-size: 30px; }
+    .brand { gap: 8px; }
+    .nav-logo { height: 20px; }
+    .brand-text h1 { font-size: 16px; }
+    .sub-text { display: none; }
+
+    /* Controls: compact single row, no wrapping */
+    .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+        flex-shrink: 0;
+    }
+    .header-controls .btn {
+        padding: 6px 10px;
+        font-size: 12px;
+        gap: 4px;
+    }
+    .header-controls .btn svg { width: 14px; height: 14px; }
+    .header-controls .btn span { display: none; }
+    .header-controls .icon-btn { padding: 6px; }
+    .header-controls .theme-icon { width: 16px; height: 16px; }
+    .mcp-pill {
+        padding: 4px 10px;
+        font-size: 10px;
+        gap: 5px;
+    }
+    .mcp-pill .status-label { display: none; }
+    .status-dot { width: 6px; height: 6px; }
+
+    /* --- Date Filter Bar: single compact row --- */
+    .date-filter-bar {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+    .date-inputs {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+        min-width: 0;
+    }
+    .filter-icon { display: none; }
+    .date-picker {
+        padding: 5px 6px;
+        font-size: 11px;
+        min-width: 0;
+        flex: 1;
+        max-width: 110px;
+    }
+    .date-sep { font-size: 12px; flex-shrink: 0; }
+    .date-inputs .btn.sm-btn {
+        padding: 5px 8px;
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+
+    /* Presets: compact pills row */
+    .quick-presets {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+    .preset-btn {
+        padding: 4px 10px;
+        font-size: 11px;
+    }
+
+    /* --- Health Cards: 2-column grid on mobile --- */
+    .dashboard-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .card { padding: 16px; }
+    .card-icon-wrap { width: 32px; height: 32px; }
+    .card-icon-wrap svg { width: 16px; height: 16px; }
+    .card-header { gap: 8px; margin-bottom: 10px; }
+    .card-title { font-size: 11px; }
+    .metric-value { font-size: 26px; letter-spacing: -1px; }
+    .metric-value .unit { font-size: 13px; }
+    .metric-subtext { font-size: 10px; }
+    .section-title { font-size: 14px; }
+
+    /* --- Modal & Table --- */
     .modal-body-grid { grid-template-columns: 1fr; }
+    .modal-card { padding: 24px; }
+    .activities-table th, .activities-table td { padding: 10px 12px; font-size: 12px; }
+}
+
+/* Extra small screens (< 400px) */
+@media (max-width: 400px) {
+    .dashboard-cards { grid-template-columns: 1fr; }
+    .date-filter-bar { flex-direction: column; align-items: stretch; }
+    .quick-presets { justify-content: space-between; }
+    .preset-btn { flex: 1; text-align: center; }
 }
