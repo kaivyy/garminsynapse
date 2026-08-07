@@ -10,6 +10,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const syncBtn = document.getElementById('sync-btn');
     const closeActModal = document.getElementById('close-act-modal');
 
+    // Date Filter Controls
+    const startDateInput = document.getElementById('start-date-input');
+    const endDateInput = document.getElementById('end-date-input');
+    const applyDateFilter = document.getElementById('apply-date-filter');
+    const presetBtns = document.querySelectorAll('.preset-btn');
+
     // Health Card Elements
     const stepsVal = document.getElementById('steps-value');
     const stepsBar = document.getElementById('steps-bar');
@@ -34,6 +40,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalActMaxHr = document.getElementById('modal-act-maxhr');
     const modalActCalories = document.getElementById('modal-act-calories');
 
+    let currentStartDate = '';
+    let currentEndDate = '';
+
+    function formatDate(d) {
+        return d.toISOString().split('T')[0];
+    }
+
     // Check System & Auth Status
     async function checkAuthStatus() {
         try {
@@ -42,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
                 if (data.authenticated) {
                     showDashboard();
-                    loadDashboardData();
+                    setPreset('today');
                 } else {
                     showLogin();
                 }
@@ -71,6 +84,49 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Handle Preset Clicks
+    presetBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            presetBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            setPreset(btn.dataset.preset);
+        });
+    });
+
+    function setPreset(presetKey) {
+        const today = new Date();
+        if (presetKey === 'today') {
+            currentStartDate = formatDate(today);
+            currentEndDate = formatDate(today);
+        } else if (presetKey === '7days') {
+            const past = new Date();
+            past.setDate(today.getDate() - 7);
+            currentStartDate = formatDate(past);
+            currentEndDate = formatDate(today);
+        } else if (presetKey === '30days') {
+            const past = new Date();
+            past.setDate(today.getDate() - 30);
+            currentStartDate = formatDate(past);
+            currentEndDate = formatDate(today);
+        } else if (presetKey === 'all') {
+            currentStartDate = '';
+            currentEndDate = '';
+        }
+
+        startDateInput.value = currentStartDate;
+        endDateInput.value = currentEndDate;
+        loadDashboardData(currentStartDate, currentEndDate);
+    }
+
+    if (applyDateFilter) {
+        applyDateFilter.addEventListener('click', () => {
+            presetBtns.forEach(b => b.classList.remove('active'));
+            currentStartDate = startDateInput.value;
+            currentEndDate = endDateInput.value;
+            loadDashboardData(currentStartDate, currentEndDate);
+        });
+    }
+
     // Handle Login Form Submission
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -92,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (res.ok && data.status === 'success') {
                 showDashboard();
-                loadDashboardData();
+                setPreset('today');
             } else {
                 loginError.textContent = data.detail || 'Invalid email or password.';
                 loginError.classList.remove('hidden');
@@ -115,10 +171,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Load Dashboard Real Data
-    async function loadDashboardData() {
+    async function loadDashboardData(startDate = '', endDate = '') {
         try {
+            let summaryUrl = '/api/v1/summary';
+            let actUrl = '/api/v1/activities';
+            
+            const params = new URLSearchParams();
+            if (startDate) params.append('start_date', startDate);
+            if (endDate) params.append('end_date', endDate);
+            
+            if (params.toString()) {
+                summaryUrl += `?${params.toString()}`;
+                actUrl += `?${params.toString()}`;
+            }
+
             // Summary
-            const summaryRes = await fetch('/api/v1/summary');
+            const summaryRes = await fetch(summaryUrl);
             if (summaryRes.ok) {
                 const summary = await summaryRes.json();
                 
@@ -151,14 +219,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Activities
-            const actRes = await fetch('/api/v1/activities');
+            const actRes = await fetch(actUrl);
             if (actRes.ok) {
                 const activities = await actRes.json();
                 activityCount.textContent = `${activities.length} workouts logged`;
                 activityTableBody.innerHTML = '';
 
                 if (activities.length === 0) {
-                    activityTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:30px;">No device connected / No workouts logged yet.</td></tr>`;
+                    activityTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:30px;">No device connected / No workouts logged for selected range.</td></tr>`;
                     return;
                 }
 
@@ -210,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
             syncBtn.innerHTML = '🔄 Syncing...';
             try {
                 await fetch('/api/v1/sync', { method: 'POST' });
-                await loadDashboardData();
+                await loadDashboardData(currentStartDate, currentEndDate);
             } catch (err) {
                 console.error('Sync failed:', err);
             } finally {

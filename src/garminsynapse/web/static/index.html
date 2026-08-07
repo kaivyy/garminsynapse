@@ -100,6 +100,23 @@
                 </button>
             </div>
         </header>
+
+        <!-- Date Range Filter Bar -->
+        <section class="date-filter-bar glass">
+            <div class="date-inputs">
+                <span class="filter-title">📅 Date Range:</span>
+                <input type="date" id="start-date-input" class="date-picker">
+                <span class="date-sep">to</span>
+                <input type="date" id="end-date-input" class="date-picker">
+                <button id="apply-date-filter" class="btn primary-btn sm-btn">Apply Range</button>
+            </div>
+            <div class="quick-presets">
+                <button class="preset-btn active" data-preset="today">Today</button>
+                <button class="preset-btn" data-preset="7days">Last 7 Days</button>
+                <button class="preset-btn" data-preset="30days">Last 30 Days</button>
+                <button class="preset-btn" data-preset="all">All Time</button>
+            </div>
+        </section>
         
         <main class="content-grid">
             <!-- Health Overview Gauges -->
@@ -194,7 +211,7 @@
             <!-- Activities Feed Section -->
             <section class="activities-section">
                 <div class="section-header">
-                    <h2 class="section-title">Recent Workouts & Activities</h2>
+                    <h2 class="section-title">Workouts & Activities Feed</h2>
                     <span class="badge" id="activity-count">Loading...</span>
                 </div>
                 <div class="table-container glass">

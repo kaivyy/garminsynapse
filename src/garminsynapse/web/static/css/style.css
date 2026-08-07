@@ -65,6 +65,77 @@ body {
     color: var(--text-primary);
 }
 
+/* Date Filter Bar */
+.date-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.date-inputs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.filter-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.date-picker {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    outline: none;
+}
+
+.date-picker:focus {
+    border-color: var(--accent-blue);
+}
+
+.date-sep {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.quick-presets {
+    display: flex;
+    gap: 8px;
+}
+
+.preset-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-btn:hover, .preset-btn.active {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent-blue);
+    border-color: rgba(56, 189, 248, 0.3);
+}
+
+.sm-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+}
+
 /* Modal Styles */
 .modal-backdrop {
     position: fixed;
@@ -222,7 +293,7 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 16px 28px;
-    margin-bottom: 32px;
+    margin-bottom: 24px;
 }
 
 .brand {
@@ -459,6 +530,11 @@ body {
     .header-controls {
         width: 100%;
         justify-content: space-between;
+    }
+
+    .date-filter-bar {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .dashboard-cards {

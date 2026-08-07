@@ -1,9 +1,11 @@
 """FastAPI REST API routes for Garmin Synapse Web Dashboard."""
 import logging
+from datetime import datetime, date
 from typing import Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import func
 from garminsynapse.auth.manager import DualAuthManager
 from garminsynapse.db.manager import DatabaseManager
 from garminsynapse.db.schema import Activity, Sleep, HRV, Stress, BodyBattery, UserProfile
@@ -64,8 +66,11 @@ def logout():
 
 
 @router.get("/summary")
-def summary():
-    """Complete health and training metrics summary from SQLite database."""
+def summary(
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)")
+):
+    """Complete health and training metrics summary with optional custom date range filtering."""
     auth_mgr = DualAuthManager()
     if not auth_mgr.get_active_tokens():
         return JSONResponse({"error": "unauthenticated"}, status_code=401)
@@ -84,27 +89,50 @@ def summary():
     vo2_max = None
 
     try:
-        sleep_rec = session.query(Sleep).order_by(Sleep.sleep_id.desc()).first()
+        # Parse dates if provided
+        start_d = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
+        end_d = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
+
+        # Sleep query
+        sleep_q = session.query(Sleep)
+        if start_d and end_d:
+            sleep_q = sleep_q.filter(Sleep.calendar_date.between(start_d, end_d))
+        sleep_rec = sleep_q.order_by(Sleep.sleep_id.desc()).first()
         if sleep_rec and sleep_rec.sleep_score:
             sleep_score = sleep_rec.sleep_score
             
-        hrv_rec = session.query(HRV).order_by(HRV.calendar_date.desc()).first()
+        # HRV query
+        hrv_q = session.query(HRV)
+        if start_d and end_d:
+            hrv_q = hrv_q.filter(HRV.calendar_date.between(start_d, end_d))
+        hrv_rec = hrv_q.order_by(HRV.calendar_date.desc()).first()
         if hrv_rec:
             hrv_status = hrv_rec.weekly_avg
             
-        stress_rec = session.query(Stress).order_by(Stress.calendar_date.desc()).first()
+        # Stress query
+        stress_q = session.query(Stress)
+        if start_d and end_d:
+            stress_q = stress_q.filter(Stress.calendar_date.between(start_d, end_d))
+        stress_rec = stress_q.order_by(Stress.calendar_date.desc()).first()
         if stress_rec:
             stress_level = stress_rec.average_stress_level
             
-        battery_rec = session.query(BodyBattery).order_by(BodyBattery.calendar_date.desc()).first()
+        # Body Battery query
+        battery_q = session.query(BodyBattery)
+        if start_d and end_d:
+            battery_q = battery_q.filter(BodyBattery.calendar_date.between(start_d, end_d))
+        battery_rec = battery_q.order_by(BodyBattery.calendar_date.desc()).first()
         if battery_rec:
             body_battery = battery_rec.charged_value
+
     except Exception as e:
         logger.debug(f"Error querying summary metrics: {e}")
     finally:
         session.close()
 
     return JSONResponse({
+        "start_date": start_date,
+        "end_date": end_date,
         "steps": steps,
         "resting_hr": resting_hr,
         "sleep_score": sleep_score,
@@ -118,8 +146,12 @@ def summary():
 
 
 @router.get("/activities")
-def activities():
-    """List recent activities from SQLite database."""
+def activities(
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    limit: int = Query(20, ge=1, le=100)
+):
+    """List activities from SQLite database with optional custom date range filtering."""
     auth_mgr = DualAuthManager()
     if not auth_mgr.get_active_tokens():
         return JSONResponse({"error": "unauthenticated"}, status_code=401)
@@ -128,7 +160,16 @@ def activities():
     session = db.get_session()
     result = []
     try:
-        recs = session.query(Activity).order_by(Activity.start_ts.desc()).limit(20).all()
+        q = session.query(Activity)
+        if start_date and end_date:
+            try:
+                start_dt = datetime.strptime(f"{start_date} 00:00:00", "%Y-%m-%d %H:%M:%S")
+                end_dt = datetime.strptime(f"{end_date} 23:59:59", "%Y-%m-%d %H:%M:%S")
+                q = q.filter(Activity.start_ts.between(start_dt, end_dt))
+            except Exception as pe:
+                logger.warning(f"Date range parse warning: {pe}")
+
+        recs = q.order_by(Activity.start_ts.desc()).limit(limit).all()
         for r in recs:
             result.append({
                 "id": str(r.activity_id),
