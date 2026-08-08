@@ -1,7 +1,8 @@
+"""Unit tests for ETL extractor and processor."""
 import pytest
+from pathlib import Path
 from garminsynapse.etl.extractor import GarminExtractor
-from datetime import date
 
-def test_extractor_init():
-    extractor = GarminExtractor(date(2023, 1, 1), date(2023, 1, 2), "/tmp")
-    assert extractor.start_date == date(2023, 1, 1)
+def test_extractor_init(tmp_path):
+    extractor = GarminExtractor(ingest_dir=tmp_path)
+    assert extractor.ingest_dir == tmp_path

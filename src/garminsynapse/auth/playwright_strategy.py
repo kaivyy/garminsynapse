@@ -1,6 +1,5 @@
 """Playwright browser fallback login for Cloudflare CAPTCHA / MFA."""
 import logging
-from pathlib import Path
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)

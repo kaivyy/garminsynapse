@@ -29,7 +29,16 @@ class DualAuthManager:
 
         # Fallback
         import asyncio
-        tokens = asyncio.run(self.playwright_auth.login_with_browser(email, password))
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                tokens = pool.submit(asyncio.run, self.playwright_auth.login_with_browser(email, password)).result()
+        else:
+            tokens = asyncio.run(self.playwright_auth.login_with_browser(email, password))
         if tokens:
             self.token_manager.save_tokens(tokens)
             return tokens

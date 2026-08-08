@@ -72,15 +72,79 @@ class GarminProcessor:
                 cal_str = cal_date_str or sleep_dto.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
 
-                sleep_record = Sleep(
-                    user_id=user_id,
-                    calendar_date=parsed_date,
-                    total_sleep_seconds=sleep_dto.get("sleepTimeSeconds"),
-                    sleep_score=sleep_dto.get("sleepScores", {}).get("overall", {}).get("value")
-                )
-                session.merge(sleep_record)
+                scores = sleep_dto.get("sleepScores")
+                sleep_score_val = None
+                if isinstance(scores, dict):
+                    overall = scores.get("overall")
+                    if isinstance(overall, dict):
+                        sleep_score_val = overall.get("value")
+
+                existing_sleep = session.query(Sleep).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                if existing_sleep:
+                    existing_sleep.total_sleep_seconds = sleep_dto.get("sleepTimeSeconds")
+                    existing_sleep.sleep_score = sleep_score_val
+                else:
+                    session.add(Sleep(
+                        user_id=user_id,
+                        calendar_date=parsed_date,
+                        total_sleep_seconds=sleep_dto.get("sleepTimeSeconds"),
+                        sleep_score=sleep_score_val
+                    ))
                 session.commit()
                 logger.info(f"Processed sleep JSON record for {parsed_date}")
+
+            elif "_STRESS" in json_path.name and isinstance(data, dict):
+                user_id = data.get("userId", 0)
+                self._ensure_user_exists(session, user_id)
+                cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
+                parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
+                from garminsynapse.db.schema import Stress
+                existing = session.query(Stress).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                if existing:
+                    existing.avg_stress_level = data.get("overallStressLevel")
+                    existing.max_stress_level = data.get("maxStressLevel")
+                else:
+                    session.add(Stress(user_id=user_id, calendar_date=parsed_date,
+                        avg_stress_level=data.get("overallStressLevel"),
+                        max_stress_level=data.get("maxStressLevel")))
+                session.commit()
+
+            elif "_HRV" in json_path.name and isinstance(data, dict):
+                user_id = data.get("userId", 0)
+                self._ensure_user_exists(session, user_id)
+                cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
+                parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
+                from garminsynapse.db.schema import HRV
+                existing = session.query(HRV).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                summary = data.get("hrvSummary", data)
+                weekly = summary.get("weeklyAvg") if isinstance(summary, dict) else None
+                nightly = summary.get("lastNightAvg") if isinstance(summary, dict) else None
+                status_str = summary.get("status") if isinstance(summary, dict) else None
+                if existing:
+                    existing.weekly_avg = weekly
+                    existing.last_night_avg = nightly
+                    existing.status = status_str
+                else:
+                    session.add(HRV(user_id=user_id, calendar_date=parsed_date,
+                        weekly_avg=weekly, last_night_avg=nightly, status=status_str))
+                session.commit()
+
+            elif "_HEART_RATE" in json_path.name and isinstance(data, dict):
+                user_id = data.get("userId", 0)
+                self._ensure_user_exists(session, user_id)
+                cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
+                parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
+                from garminsynapse.db.schema import BodyBattery
+                existing = session.query(BodyBattery).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                charged_val = data.get("bodyBatteryChargedValue")
+                drained_val = data.get("bodyBatteryDrainedValue")
+                if existing:
+                    existing.charged = charged_val
+                    existing.drained = drained_val
+                else:
+                    session.add(BodyBattery(user_id=user_id, calendar_date=parsed_date,
+                        charged=charged_val, drained=drained_val))
+                session.commit()
         except Exception as e:
             session.rollback()
             logger.error(f"Failed to process JSON summary {json_path}: {e}")
@@ -108,7 +172,7 @@ class GarminProcessor:
                 parsed_ts = None
                 if start_ts_str:
                     try:
-                        parsed_ts = datetime.strptime(start_ts_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
+                        parsed_ts = datetime.strptime(start_ts_str.split(".")[0].replace("T", " "), "%Y-%m-%d %H:%M:%S")
                     except Exception:
                         parsed_ts = datetime.utcnow()
 
@@ -116,7 +180,7 @@ class GarminProcessor:
                     activity_id=act_id,
                     user_id=user_id,
                     activity_name=act.get("activityName", "Workout"),
-                    activity_type_key=act.get("activityType", {}).get("typeKey", "activity"),
+                    activity_type_key=(act.get("activityType") or {}).get("typeKey", "activity"),
                     start_ts=parsed_ts or datetime.utcnow(),
                     duration=act.get("duration"),
                     distance=act.get("distance"),

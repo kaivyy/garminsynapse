@@ -1,13 +1,15 @@
 """Native FastMCP Server tools with full database, API, and analytics integration."""
 import logging
 from typing import Dict, Any, List
+from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from sqlalchemy import text
 from garminsynapse.auth.manager import DualAuthManager
 from garminsynapse.db.manager import DatabaseManager
-from garminsynapse.db.schema import Activity, Sleep, HRV, Stress, UserProfile
+from garminsynapse.db.schema import Activity
 from garminsynapse.core.api import GarminAPI
 from garminsynapse.etl.extractor import GarminExtractor
+from garminsynapse.etl.processor import GarminProcessor
 
 logger = logging.getLogger(__name__)
 mcp = FastMCP("garminsynapse", description="Garmin Synapse MCP Server - Direct access to Garmin Connect training, health, sleep, and SQLite data.")
@@ -44,6 +46,7 @@ def garmin_sync(days: int = 7) -> Dict[str, Any]:
     """Extract recent health, wellness, and activity data into local SQLite database."""
     extractor = GarminExtractor()
     extractor.extract_all(days=days)
+    GarminProcessor().process_ingest_directory()
     return {
         "status": "success",
         "message": f"Successfully extracted last {days} days of Garmin data into SQLite DB."
@@ -179,8 +182,11 @@ def query_garmin_db(sql_query: str) -> List[Dict[str, Any]]:
     if not sql_query.strip().lower().startswith("select"):
         return [{"error": "Only SELECT queries are permitted."}]
 
-    db = DatabaseManager()
-    with db.engine.connect() as conn:
-        res = conn.execute(text(sql_query))
-        keys = res.keys()
-        return [dict(zip(keys, row)) for row in res.fetchall()]
+    try:
+        db = DatabaseManager()
+        with db.engine.connect() as conn:
+            res = conn.execute(text(sql_query))
+            keys = res.keys()
+            return [dict(zip(keys, row)) for row in res.fetchall()]
+    except Exception as e:
+        return [{"error": f"SQL execution failed: {str(e)}"}]

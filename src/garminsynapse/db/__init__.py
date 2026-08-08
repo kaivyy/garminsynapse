@@ -1,0 +1,1 @@
+"""Garmin Synapse database module."""

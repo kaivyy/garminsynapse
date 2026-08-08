@@ -1,0 +1,1 @@
+"""Garmin Synapse authentication module."""

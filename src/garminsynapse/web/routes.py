@@ -10,6 +10,7 @@ from garminsynapse.auth.manager import DualAuthManager
 from garminsynapse.db.manager import DatabaseManager
 from garminsynapse.db.schema import Activity, Sleep, HRV, Stress, BodyBattery, UserProfile
 from garminsynapse.etl.extractor import GarminExtractor
+from garminsynapse.etl.processor import GarminProcessor
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -44,6 +45,7 @@ def login(req: LoginRequest):
         try:
             extractor = GarminExtractor()
             extractor.extract_all(days=7)
+            GarminProcessor().process_ingest_directory()
         except Exception as sync_err:
             logger.warning(f"Initial post-login sync warning: {sync_err}")
 
@@ -115,7 +117,7 @@ def summary(
             stress_q = stress_q.filter(Stress.calendar_date.between(start_d, end_d))
         stress_rec = stress_q.order_by(Stress.calendar_date.desc()).first()
         if stress_rec:
-            stress_level = stress_rec.average_stress_level
+            stress_level = stress_rec.avg_stress_level
             
         # Body Battery query
         battery_q = session.query(BodyBattery)
@@ -123,7 +125,7 @@ def summary(
             battery_q = battery_q.filter(BodyBattery.calendar_date.between(start_d, end_d))
         battery_rec = battery_q.order_by(BodyBattery.calendar_date.desc()).first()
         if battery_rec:
-            body_battery = battery_rec.charged_value
+            body_battery = battery_rec.charged
 
     except Exception as e:
         logger.debug(f"Error querying summary metrics: {e}")
@@ -230,6 +232,7 @@ def sync():
     try:
         extractor = GarminExtractor()
         extractor.extract_all(days=14)
+        GarminProcessor().process_ingest_directory()
         return JSONResponse({"status": "success", "message": "Extracted real Garmin Connect data into SQLite database."})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

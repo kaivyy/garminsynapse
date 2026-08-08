@@ -1,9 +1,9 @@
 """SQLAlchemy 40+ table models for Garmin health, activities, and wellness."""
 from datetime import datetime
 from sqlalchemy import (
-    Column, BigInteger, Integer, Float, String, Boolean, DateTime, Date, ForeignKey, Index
+    Column, BigInteger, Integer, Float, String, Boolean, DateTime, Date, ForeignKey, UniqueConstraint
 )
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
@@ -36,7 +36,7 @@ class Activity(Base):
     activity_name = Column(String)
     activity_type_key = Column(String, nullable=False)
     start_ts = Column(DateTime, nullable=False)
-    end_ts = Column(DateTime, nullable=False)
+    end_ts = Column(DateTime, nullable=True)
     duration = Column(Float)
     distance = Column(Float)
     average_speed = Column(Float)
@@ -44,12 +44,14 @@ class Activity(Base):
     average_hr = Column(Float)
     max_hr = Column(Float)
     calories = Column(Float)
+    elapsed_duration = Column(Float)
+    elevation_gain = Column(Float)
     create_ts = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class ActivityTsMetric(Base):
     __tablename__ = "activity_ts_metric"
-    activity_id = Column(BigInteger, ForeignKey("activity.activity_id"), primary_key=True)
+    activity_id = Column(BigInteger, ForeignKey("activity.activity_id", ondelete="CASCADE"), primary_key=True)
     timestamp = Column(DateTime, primary_key=True)
     latitude = Column(Float)
     longitude = Column(Float)
@@ -62,6 +64,7 @@ class ActivityTsMetric(Base):
 
 class Sleep(Base):
     __tablename__ = "sleep"
+    __table_args__ = (UniqueConstraint('user_id', 'calendar_date', name='uq_sleep_user_date'),)
     sleep_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("user.user_id"), nullable=False)
     calendar_date = Column(Date, nullable=False)
@@ -77,6 +80,7 @@ class Sleep(Base):
 
 class HRV(Base):
     __tablename__ = "hrv"
+    __table_args__ = (UniqueConstraint('user_id', 'calendar_date', name='uq_hrv_user_date'),)
     hrv_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("user.user_id"), nullable=False)
     calendar_date = Column(Date, nullable=False)
@@ -87,6 +91,7 @@ class HRV(Base):
 
 class Stress(Base):
     __tablename__ = "stress"
+    __table_args__ = (UniqueConstraint('user_id', 'calendar_date', name='uq_stress_user_date'),)
     stress_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("user.user_id"), nullable=False)
     calendar_date = Column(Date, nullable=False)
@@ -96,6 +101,7 @@ class Stress(Base):
 
 class BodyBattery(Base):
     __tablename__ = "body_battery"
+    __table_args__ = (UniqueConstraint('user_id', 'calendar_date', name='uq_bb_user_date'),)
     body_battery_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("user.user_id"), nullable=False)
     calendar_date = Column(Date, nullable=False)

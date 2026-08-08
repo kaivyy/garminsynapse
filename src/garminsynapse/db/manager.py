@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import event as sa_event
 from garminsynapse.db.schema import Base
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,13 @@ class DatabaseManager:
             connect_args={"check_same_thread": False}
         )
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+
+        @sa_event.listens_for(self.engine, "connect")
+        def _set_sqlite_pragma(dbapi_conn, connection_record):
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON;")
+            cursor.close()
+
         self.init_db()
 
     def init_db(self) -> None:
@@ -37,7 +45,7 @@ class DatabaseManager:
         return self.SessionLocal()
 
     def downsample(self, days_keep_raw: int = 30) -> int:
-        """Downsample 1-second activity metrics older than threshold into averages."""
+        """Delete raw 1-second activity metrics older than threshold."""
         query = text("""
             DELETE FROM activity_ts_metric
             WHERE timestamp < datetime('now', '-' || :days || ' days')
@@ -50,12 +58,20 @@ class DatabaseManager:
 
     def prune(self, days_keep: int = 365) -> int:
         """Prune old database records to bound disk usage."""
-        query = text("""
+        child_query = text("""
+            DELETE FROM activity_ts_metric
+            WHERE activity_id IN (
+                SELECT activity_id FROM activity
+                WHERE start_ts < datetime('now', '-' || :days || ' days')
+            )
+        """)
+        parent_query = text("""
             DELETE FROM activity
             WHERE start_ts < datetime('now', '-' || :days || ' days')
         """)
         with self.engine.connect() as conn:
-            res = conn.execute(query, {"days": days_keep})
+            conn.execute(child_query, {"days": days_keep})
+            res = conn.execute(parent_query, {"days": days_keep})
             conn.commit()
             logger.info(f"Pruned {res.rowcount} activities older than {days_keep} days.")
             return res.rowcount

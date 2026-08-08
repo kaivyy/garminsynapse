@@ -24,6 +24,7 @@ class TokenManager:
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(tokens, f, indent=2)
         temp_file.replace(self.token_file)
+        os.chmod(self.token_file, 0o600)
         logger.info(f"Saved tokens to {self.token_file}")
 
     def load_tokens(self) -> Optional[Dict[str, Any]]:

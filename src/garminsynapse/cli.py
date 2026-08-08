@@ -14,7 +14,7 @@ def cli():
 
 @cli.command()
 @click.option("--host", default="0.0.0.0", help="Host to bind server to.")
-@click.option("--port", default=8000, help="Port to bind server to.")
+@click.option("--port", default=6060, help="Port to bind server to.")
 def start_server(host, port):
     """Start the FastAPI Web Dashboard & REST API server."""
     import uvicorn
@@ -30,6 +30,8 @@ def sync(days):
     click.echo(f"🔄 Syncing last {days} days of Garmin Connect data...")
     extractor = GarminExtractor()
     extractor.extract_all(days=days)
+    from garminsynapse.etl.processor import GarminProcessor
+    GarminProcessor().process_ingest_directory()
     click.echo("✅ Sync complete!")
 
 
@@ -37,7 +39,7 @@ def sync(days):
 def mcp():
     """Run the native Python MCP server (STDIO transport)."""
     from garminsynapse.mcp.server import run_server
-    click.echo("🤖 Starting Garmin Synapse MCP Server...")
+    click.echo("🤖 Starting Garmin Synapse MCP Server...", err=True)
     run_server()
 
 
