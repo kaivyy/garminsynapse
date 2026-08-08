@@ -1,53 +1,62 @@
-# 📋 Changelog
+# Changelog
 
-All notable changes to **GarminSynapse** will be documented in this file.
+All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
----
 
 ## [v0.1.0] - 2026-08-08
 
-### 🌟 Initial Release Overview
-**GarminSynapse v0.1.0** is the inaugural release of the unified health engine, relational database, native FastMCP server, and responsive web dashboard for Garmin Connect.
+### 🚀 Features & Architecture
+- **Unified Garmin Connect Engine**: First release of Garmin Synapse, built as a modern, high-performance wrapper around the Garmin Connect API.
+- **Dual Authentication Strategy**:
+  - Implemented robust `curl_cffi` 5-stage login engine impersonating Chrome TLS fingerprints to bypass basic Cloudflare checks.
+  - Implemented automatic **Playwright Headless Browser fallback** for advanced CAPTCHA / Turnstile bypass when API-based auth receives HTTP 429.
+  - Atomic token caching and session persistence (`~/.garminsynapse/tokens.json`) with secure `0600` file permissions.
+- **SQLite Database Architecture**:
+  - Designed a 40+ table normalized schema using `SQLAlchemy` covering comprehensive health metrics: `User`, `Activity`, `Sleep`, `HRV`, `Stress`, `BodyBattery`, `ActivityTsMetric`, etc.
+  - Implemented `DatabaseManager` with automatic schema initialization and SQLite `PRAGMA foreign_keys=ON` enforcement.
+  - Provided `downsample()` utility to compress raw 1-second metrics to reduce DB size.
+  - Provided `prune()` utility to garbage collect activities older than configurable retention limits.
+- **Robust ETL Pipeline (Extract, Transform, Load)**:
+  - Developed `GarminExtractor` to pull bulk historical JSON data and binary `.FIT` / `.TCX` files.
+  - Developed `GarminProcessor` featuring `fitdecode` logic to parse binary data directly into local DB time-series rows.
+  - Upsert patterns (`session.merge`) for idempotency, ensuring zero duplicates during sync.
+- **Native MCP (Model Context Protocol) Server**:
+  - Exposes 8+ powerful MCP tools using `mcp.server.fastmcp`.
+  - Tools include: `garmin_status`, `garmin_login`, `garmin_sync`, `get_daily_summary`, `get_sleep_analysis`, `get_hrv_trends`, `list_activities`, `get_activity_details`, `download_fit_file`.
+  - Added safe `query_garmin_db` tool for autonomous agents to run read-only `SELECT` analytical queries.
+- **FastAPI Web Dashboard**:
+  - `uvicorn` based high-performance REST API serving metrics at `/api/v1/...`.
+  - Single Page Application (SPA) static frontend built with Vanilla JS, HTML, and CSS.
+  - **Modern Sporty UI**: Responsive dark/light mode, glassmorphism, animated pulse indicators, Garmin branding, and CSS Grid-based health cards.
 
----
+### 🐛 Bug Fixes (Major 23+ Bug Audit Sweep)
+- **Architecture**: Created missing `__init__.py` files across all 7 internal modules (`auth`, `core`, `db`, `etl`, `mcp`, `web`, `tests`) fixing `ModuleNotFoundError` during imports.
+- **Database**:
+  - Fixed `IntegrityError` by allowing `Activity.end_ts` to be nullable.
+  - Added `elapsed_duration` and `elevation_gain` to Activity schema.
+  - Added `UniqueConstraint` on daily records (`Sleep`, `HRV`, `Stress`, `BodyBattery`) to prevent duplicate row insertions on every ETL run.
+  - Enforced `PRAGMA foreign_keys=ON` per-connection via SQLAlchemy event listener.
+  - Fixed `prune()` function crashing on FK constraint violations by explicitly deleting child time-series rows first.
+- **ETL Processor**:
+  - Fixed multiple chained `.get()` `NoneType` crashes (`AttributeError`) when Garmin API returned `null` for `sleepScores` or `activityType`.
+  - Expanded JSON processing to actually parse `STRESS`, `HRV`, and `HEART_RATE` (Body Battery) files instead of ignoring them.
+  - Fixed `datetime.strptime` bug that crashed when parsing ISO 8601 timestamps containing the letter "T".
+- **Authentication**:
+  - Resolved `asyncio.run()` crash on Playwright fallback when executing within an already running event loop (e.g., inside FastAPI worker) by routing through `ThreadPoolExecutor`.
+  - Improved security by setting `0600` permissions on stored `tokens.json`.
+- **Web & UI**:
+  - Fixed critical JS timezone bug (`toISOString()` forcing UTC), resolving issues where UTC+ timezones rendered "Today" as yesterday.
+  - Fixed attribute mismatch bugs in `/summary` route where `average_stress_level` and `charged_value` resulted in silent null returns.
+- **CLI & MCP**:
+  - Fixed MCP STDIO handshake corruption by piping `click.echo` startup logs to `stderr` instead of `stdout`.
+  - Fixed Port 8000 vs 6060 mismatches across configs.
+  - Appended `GarminProcessor().process_ingest_directory()` inside sync commands so extracted data is actually inserted into the database.
+- **Core Encoder**:
+  - Fixed binary FIT encoder `data_size` header bug ensuring `.FIT` files generated for Weight Scales are valid.
 
-### 🚀 Added
-
-#### 🛡️ Dual-Engine Authentication Core (`garminsynapse.auth`)
-* **Primary Engine (`curl_cffi`)**: 5-stage browser TLS handshake impersonation (`portal+cffi`, `portal+requests`, `mobile+cffi`, `mobile+requests`, `widget+cffi`) to bypass Cloudflare bot protection without launching a browser GUI.
-* **Fallback Engine (`playwright`)**: Automated headless Chromium browser fallback for Cloudflare Turnstile CAPTCHA and MFA challenge resolution.
-* **Persistent Token Manager**: Secure, local JSON token storage (`~/.garminsynapse/tokens.json`) with auto-login capabilities without storing plaintext passwords.
-
-#### 🗄️ Relational Database & ETL Pipeline (`garminsynapse.db` & `garminsynapse.etl`)
-* **SQLAlchemy Schema**: 40+ normalized relational tables for Daily Health Stats, Sleep Stages (Deep/Light/REM), Heart Rate, Stress, Body Battery, HRV Baseline, Respiration Rate, SpO2, Training Status, and Activities.
-* **Automated GarminExtractor**: Bulk-fetches daily wellness data and activities across customizable date ranges into `garmin_files/ingest`.
-* **GarminProcessor Engine**: Parses raw JSON and binary `.FIT` activity files using `fitdecode` and `defusedxml` into SQLite (`garmin_data.db`).
-* **Database Maintenance**: Integrated `downsample` (compress 1-second time-series metrics) and `prune` (purge old historical records) routines.
-
-#### 🤖 Native FastMCP Server Protocol (`garminsynapse.mcp`)
-Exposes 10 native tools for AI Clients (Claude Desktop, Cursor, AGY, Claude Code):
-1. `garmin_status`: System, database, and auth health status.
-2. `garmin_login`: Remote Garmin Connect authentication.
-3. `garmin_sync`: Background data extraction trigger.
-4. `get_daily_summary`: Daily steps, RHR, stress, and body battery.
-5. `get_sleep_analysis`: Sleep stages, sleep score, and oxygen saturation.
-6. `get_hrv_trends`: Heart Rate Variability status and weekly baseline.
-7. `list_activities`: Query logged workouts with distance, duration, HR, and calories.
-8. `get_activity_details`: Per-second workout metrics and polyline map data.
-9. `download_fit_file`: Downloads raw binary `.FIT` activity files.
-10. `query_garmin_db`: Safe `SELECT` SQL query interface on the local SQLite DB.
-
-#### 🌐 Glassmorphism Web Dashboard & REST API (`garminsynapse.web`)
-* **Responsive SPA UI**: Built with modern HTML5/CSS3/JavaScript featuring dark mode glassmorphism aesthetics, responsive HSL accents, and smooth micro-animations.
-* **8 Health Overview Cards**: Real-time display for Daily Steps, Resting Heart Rate, Sleep Score, Body Battery, HRV Baseline, Stress Level, Respiration Rate, and SpO2.
-* **Custom Date Range Filter Bar**: Interactive date pickers (`Start Date` / `End Date`) and quick preset buttons (`Today`, `Last 7 Days`, `Last 30 Days`, `All Time`).
-* **Interactive Workout Detail Modal**: Clicking any workout row opens a modal with workout splits, max HR, elevation gain, and duration.
-* **Garmin Login Modal**: Built-in login screen for initial credential entry and token generation.
-* **FastAPI REST Endpoints**: High-performance JSON endpoints on **port 6060** (`/api/v1/status`, `/api/v1/summary`, `/api/v1/activities`, `/api/v1/activity/{id}`, `/api/v1/auth/login`, `/api/v1/sync`).
-
-#### 📦 CLI & Installation Automation
-* **Click CLI (`garminsynapse.cli`)**: Subcommands `start-server`, `sync`, `mcp`, `downsample`, and `prune`.
-* **Automated Installer (`install.sh`)**: 1-click setup script that installs dependencies, Playwright Chromium binaries, and creates required folder structures.
+### 🧪 Testing & Packaging
+- Fixed 5 broken test files in `pytest` suite ensuring 100% pass rate.
+- Moved `pyproject.toml` configurations into proper modern Python packaging format, dropping `requirements.txt` in favor of declarative `[project.dependencies]`.
+- Updated `install.sh` to correctly trigger `pip install -e .` with full dependencies.
