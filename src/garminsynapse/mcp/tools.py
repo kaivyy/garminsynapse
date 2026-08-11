@@ -1,8 +1,8 @@
-"""Native FastMCP Server tools with full database, API, and analytics integration."""
+"""Native MCP Server tools with full database, API, and analytics integration."""
 import logging
 from typing import Dict, Any, List
 from pathlib import Path
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 from sqlalchemy import text
 from garminsynapse.auth.manager import DualAuthManager
 from garminsynapse.db.manager import DatabaseManager
@@ -12,7 +12,7 @@ from garminsynapse.etl.extractor import GarminExtractor
 from garminsynapse.etl.processor import GarminProcessor
 
 logger = logging.getLogger(__name__)
-mcp = FastMCP("garminsynapse", description="Garmin Synapse MCP Server - Direct access to Garmin Connect training, health, sleep, and SQLite data.")
+mcp = MCPServer("garminsynapse", description="Garmin Synapse MCP Server - Direct access to Garmin Connect training, health, sleep, and SQLite data.")
 
 
 @mcp.tool()
