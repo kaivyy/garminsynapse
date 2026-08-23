@@ -151,6 +151,23 @@
         </section>
 
         <main class="content-grid">
+            <!-- Connected Garmin Device Section -->
+            <section class="device-section glass" id="device-card-section" style="margin-bottom: 24px; padding: 18px 24px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="background: rgba(0, 150, 255, 0.15); padding: 12px; border-radius: 12px; color: #0096ff; display: flex; align-items: center; justify-content: center;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><circle cx="12" cy="12" r="7"/><polyline points="12 9 12 12 13.5 13.5"/><path d="M16.51 17.35l-.35 3.83a2 2 0 0 1-2 1.82H9.83a2 2 0 0 1-2-1.82l-.35-3.83m.01-10.7l.35-3.83A2 2 0 0 1 9.83 1h4.35a2 2 0 0 1 2 1.82l.35 3.83"/></svg>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700;">Garmin Hardware & Device</div>
+                        <div id="device-model-name" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">Checking device...</div>
+                        <div id="device-extra-info" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">--</div>
+                    </div>
+                </div>
+                <div id="device-status-badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                    ● Active
+                </div>
+            </section>
+
             <!-- Health Overview Cards -->
             <section class="overview-section">
                 <h2 class="section-title">
@@ -282,9 +299,9 @@
         </main>
 
         <footer class="app-footer">
-            <span>GarminSynapse v0.1.0 — Open Source Health Engine & MCP Server</span>
+            <span>GarminSynapse v0.2.1 — Open Source Health Engine & MCP Server</span>
         </footer>
     </div>
-    <script src="/js/app.js"></script>
+    <script src="/js/app.js?v=1.2.1"></script>
 </body>
 </html>

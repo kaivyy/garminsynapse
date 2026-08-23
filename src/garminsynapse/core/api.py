@@ -42,8 +42,18 @@ class GarminAPI:
             cached = token_mgr.load_tokens() or {}
             headers = session_headers or cached.get("headers")
             target_email = email or cached.get("email")
+            client_state = cached.get("client_state")
 
-            if target_email and password:
+            if client_state:
+                try:
+                    g = garminconnect.Garmin()
+                    g.client.loads(client_state)
+                    self._garmin_instance = g
+                    if hasattr(g, "client") and hasattr(g.client, "session"):
+                        self.session = g.client.session
+                except Exception as e:
+                    logger.warning(f"Could not restore logged in Garmin instance from client_state: {e}")
+            elif target_email and password:
                 try:
                     g = garminconnect.Garmin(email=target_email, password=password)
                     g.login()

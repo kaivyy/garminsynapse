@@ -16,14 +16,22 @@ class CffiStrategy:
         logger.info(f"Authenticating Garmin Connect for {email}...")
         garmin = Garmin(email=email, password=password, prompt_mfa=prompt_mfa)
         garmin.login()
-
         client_obj = getattr(garmin, "client", None)
         headers = dict(client_obj.session.headers) if (client_obj and hasattr(client_obj, "session")) else {}
+        
+        client_dump = None
+        if client_obj and hasattr(client_obj, "dumps"):
+            try:
+                client_dump = client_obj.dumps()
+            except Exception as e:
+                logger.warning(f"Could not serialize garmin client: {e}")
 
         tokens = {
             "email": email,
             "user_id": getattr(garmin, "display_name", None) or getattr(garmin, "username", None),
+            "client_state": client_dump,
             "headers": headers,
             "source": "cffi_strategy"
         }
         return tokens
+

@@ -63,6 +63,8 @@ class GarminExtractor:
             # 7. Training Status / Readiness
             self._save_endpoint_json(api, "get_training_status", date_str, f"{date_str}_TRAINING_STATUS.json")
 
+            import time
+            time.sleep(0.3)
             curr += timedelta(days=1)
 
         # 8. User Profile

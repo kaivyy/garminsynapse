@@ -116,7 +116,60 @@ document.addEventListener('DOMContentLoaded', () => {
     function showDashboard() {
         loginModal.classList.add('hidden');
         dashboardContainer.classList.remove('hidden');
+        loadDeviceInfo();
     }
+
+    async function loadDeviceInfo() {
+        const modelElem = document.getElementById('device-model-name');
+        const infoElem = document.getElementById('device-extra-info');
+        const badgeElem = document.getElementById('device-status-badge');
+        try {
+            const devRes = await fetch('/api/v1/devices');
+            if (devRes.ok) {
+                const devData = await devRes.json();
+                if (devData.devices && devData.devices.length > 0) {
+                    const dev = devData.devices[0];
+                    const devName = dev.productDisplayName || dev.displayName || dev.deviceCategory || 'Garmin Watch';
+                    const serial = dev.serialNumber ? `SN: ${dev.serialNumber}` : '';
+                    const unitId = dev.unitId ? `Unit ID: ${dev.unitId}` : '';
+                    const fw = dev.currentFirmwareVersion ? `Firmware v${dev.currentFirmwareVersion}` : '';
+                    const infoText = [serial, unitId, fw].filter(Boolean).join(' • ');
+                    
+                    if (modelElem) modelElem.textContent = devName;
+                    if (infoElem) infoElem.textContent = infoText || 'Device Connected';
+                    if (badgeElem) {
+                        badgeElem.textContent = '● Connected';
+                        badgeElem.style.background = 'rgba(16, 185, 129, 0.15)';
+                        badgeElem.style.color = '#10b981';
+                    }
+                } else if (devData.primary && devData.primary.RegisteredDevices && devData.primary.RegisteredDevices.length > 0) {
+                    const reg = devData.primary.RegisteredDevices[0];
+                    const devName = reg.displayName || 'Garmin Watch';
+                    const serial = reg.serialNumber ? `SN: ${reg.serialNumber}` : '';
+                    const fw = reg.currentFirmwareVersion ? `Firmware v${reg.currentFirmwareVersion}` : '';
+                    const infoText = [serial, fw].filter(Boolean).join(' • ');
+                    if (modelElem) modelElem.textContent = devName;
+                    if (infoElem) infoElem.textContent = infoText || 'Device Connected';
+                    if (badgeElem) {
+                        badgeElem.textContent = '● Connected';
+                        badgeElem.style.background = 'rgba(16, 185, 129, 0.15)';
+                        badgeElem.style.color = '#10b981';
+                    }
+                } else {
+                    if (modelElem) modelElem.textContent = 'No Garmin Device Found';
+                    if (infoElem) infoElem.textContent = 'No registered watch or tracker detected on this Garmin account.';
+                    if (badgeElem) {
+                        badgeElem.textContent = '○ Not Paired';
+                        badgeElem.style.background = 'rgba(239, 68, 68, 0.15)';
+                        badgeElem.style.color = '#ef4444';
+                    }
+                }
+            }
+        } catch (devErr) {
+            console.warn('Could not load device info:', devErr);
+        }
+    }
+
 
     // ============================================================
     // Activity Detail Modal
@@ -242,6 +295,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 actUrl += `?${params.toString()}`;
             }
 
+            // Fetch Connected Device Info
+            try {
+                const devRes = await fetch('/api/v1/devices');
+                if (devRes.ok) {
+                    const devData = await devRes.json();
+                    const modelElem = document.getElementById('device-model-name');
+                    const infoElem = document.getElementById('device-extra-info');
+                    const badgeElem = document.getElementById('device-status-badge');
+                    
+                    if (devData.devices && devData.devices.length > 0) {
+                        const dev = devData.devices[0];
+                        const devName = dev.productDisplayName || dev.displayName || dev.deviceCategory || 'Garmin Watch';
+                        const serial = dev.serialNumber ? `SN: ${dev.serialNumber}` : '';
+                        const unitId = dev.unitId ? `Unit ID: ${dev.unitId}` : '';
+                        const fw = dev.currentFirmwareVersion ? `Firmware v${dev.currentFirmwareVersion}` : '';
+                        const infoText = [serial, unitId, fw].filter(Boolean).join(' • ');
+                        
+                        if (modelElem) modelElem.textContent = devName;
+                        if (infoElem) infoElem.textContent = infoText || 'Device Connected';
+                        if (badgeElem) {
+                            badgeElem.textContent = '● Connected';
+                            badgeElem.style.background = 'rgba(16, 185, 129, 0.15)';
+                            badgeElem.style.color = '#10b981';
+                        }
+                    } else {
+                        if (modelElem) modelElem.textContent = 'No Garmin Device Found';
+                        if (infoElem) infoElem.textContent = 'No registered watch or tracker detected on this Garmin account.';
+                        if (badgeElem) {
+                            badgeElem.textContent = '○ Not Paired';
+                            badgeElem.style.background = 'rgba(239, 68, 68, 0.15)';
+                            badgeElem.style.color = '#ef4444';
+                        }
+                    }
+                }
+            } catch (devErr) {
+                console.warn('Could not load device info:', devErr);
+            }
+
             // Summary
             const summaryRes = await fetch(summaryUrl);
             if (summaryRes.ok) {
@@ -260,13 +351,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 sleepScore.innerHTML = summary.sleep_score ? `${summary.sleep_score} <span class="unit">/ 100</span>` : `-- <span class="unit">/ 100</span>`;
 
                 // Body Battery
-                batteryVal.innerHTML = summary.body_battery ? `${summary.body_battery} <span class="unit">%</span>` : `-- <span class="unit">%</span>`;
+                let finalBB = summary.body_battery;
+                // Stress Level
+                let finalStress = summary.stress_level;
+                let stressSuffix = '';
+
+                // Fetch Live Metrics for Today if DB is empty/partial
+                if (!startDate || startDate === formatDate(new Date())) {
+                    try {
+                        const liveRes = await fetch('/api/v1/live');
+                        if (liveRes.ok) {
+                            const liveData = await liveRes.json();
+                            if (liveData.status === 'success') {
+                                if (liveData.body_battery !== null && !finalBB) {
+                                    finalBB = liveData.body_battery;
+                                }
+                                if (liveData.stress_level !== null && !finalStress) {
+                                    finalStress = liveData.stress_level;
+                                    if (liveData.stress_status) stressSuffix = ` (${liveData.stress_status})`;
+                                }
+                                if (liveData.steps && !stepsNum) {
+                                    stepsVal.textContent = liveData.steps.toLocaleString();
+                                }
+                            }
+                        }
+                    } catch (liveErr) {
+                        console.warn('Could not fetch live metrics:', liveErr);
+                    }
+                }
+
+                batteryVal.innerHTML = finalBB !== null && finalBB !== undefined ? `${finalBB} <span class="unit">%</span>` : `-- <span class="unit">%</span>`;
+                stressVal.innerHTML = finalStress !== null && finalStress !== undefined ? `${finalStress} <span class="unit">/ 100${stressSuffix}</span>` : `-- <span class="unit">/ 100</span>`;
 
                 // HRV
                 hrvVal.innerHTML = summary.hrv_status ? `${summary.hrv_status} <span class="unit">ms</span>` : `-- <span class="unit">ms</span>`;
-
-                // Stress Level
-                stressVal.innerHTML = summary.stress_level ? `${summary.stress_level} <span class="unit">/ 100</span>` : `-- <span class="unit">/ 100</span>`;
 
                 // Respiration Rate
                 respVal.innerHTML = summary.respiration_rate ? `${summary.respiration_rate} <span class="unit">brpm</span>` : `-- <span class="unit">brpm</span>`;
@@ -274,6 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // SpO2
                 spo2Val.innerHTML = summary.spo2 ? `${summary.spo2} <span class="unit">%</span>` : `-- <span class="unit">%</span>`;
             }
+
 
             // Activities
             const actRes = await fetch(actUrl);

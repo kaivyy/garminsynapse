@@ -42,6 +42,86 @@ def garmin_login(email: str, password: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+def get_garmin_devices() -> Dict[str, Any]:
+    """Get all registered Garmin devices, watch model names, serial numbers, unit IDs, and firmware versions."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated", "message": "Not authenticated with Garmin"}
+    try:
+        devices = api._garmin_instance.get_devices()
+        primary = None
+        try:
+            primary = api._garmin_instance.get_primary_training_device()
+        except Exception:
+            pass
+        return {
+            "status": "success",
+            "devices": devices or [],
+            "primary": primary
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_live_metrics() -> Dict[str, Any]:
+    """Get live point-in-time biometric readings for today (latest Body Battery %, charged/drained, latest Stress score & status, HR, Steps)."""
+    from datetime import datetime
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated", "message": "Not authenticated with Garmin"}
+
+    g = api._garmin_instance
+    today = datetime.now().strftime("%Y-%m-%d")
+    live_bb = None
+    charged = None
+    drained = None
+    live_stress = None
+    stress_status = None
+
+    try:
+        bb = g.get_body_battery(today)
+        if isinstance(bb, list):
+            for item in bb:
+                if isinstance(item, dict):
+                    charged = item.get("charged", charged)
+                    drained = item.get("drained", drained)
+                    for pt in item.get("bodyBatteryValuesArray", []):
+                        if len(pt) > 1 and pt[1] is not None:
+                            live_bb = pt[1]
+    except Exception as e:
+        logger.debug(f"MCP live BB error: {e}")
+
+    try:
+        stress = g.get_stress_data(today)
+        if isinstance(stress, dict):
+            for pt in stress.get("stressValuesArray", []):
+                if len(pt) > 1 and pt[1] is not None and pt[1] >= 0:
+                    live_stress = pt[1]
+            if live_stress is not None:
+                if live_stress <= 25:
+                    stress_status = "Rest"
+                elif live_stress <= 50:
+                    stress_status = "Low"
+                elif live_stress <= 75:
+                    stress_status = "Medium"
+                else:
+                    stress_status = "High"
+    except Exception as e:
+        logger.debug(f"MCP live stress error: {e}")
+
+    return {
+        "status": "success",
+        "date": today,
+        "body_battery": live_bb,
+        "charged": charged,
+        "drained": drained,
+        "stress_level": live_stress,
+        "stress_status": stress_status
+    }
+
+
+@mcp.tool()
 def garmin_sync(days: int = 7) -> Dict[str, Any]:
     """Extract recent health, wellness, and activity data into local SQLite database."""
     extractor = GarminExtractor()
@@ -51,6 +131,7 @@ def garmin_sync(days: int = 7) -> Dict[str, Any]:
         "status": "success",
         "message": f"Successfully extracted last {days} days of Garmin data into SQLite DB."
     }
+
 
 
 @mcp.tool()

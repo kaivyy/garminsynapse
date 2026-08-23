@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.1] - 2026-08-23
+
+### 🚀 Features & Enhancements
+- **Live Real-Time Biometric Engine**:
+  - Added `/api/v1/live` REST API endpoint with point-in-time extraction for today's Body Battery %, charged/drained energy, Stress score (Rest/Low/Medium/High), and real-time steps.
+  - Added `get_live_metrics` MCP tool enabling AI agents to read point-in-time wellness status.
+  - Integrated live sensor values seamlessly into Web Dashboard cards.
+- **Garmin Hardware & Device Tracking**:
+  - Added native integration for Garmin devices (`get_devices()` and `get_primary_training_device()`).
+  - Added `/api/v1/devices` REST endpoint and `get_garmin_devices` MCP tool to expose registered hardware, active watch model, serial number, unit ID, and firmware version.
+  - Added **Connected Garmin Device** glassmorphism card to the Web Dashboard UI with real-time pairing status indicator.
+- **Smart In-Memory Caching & Account Security**:
+  - Implemented in-memory TTL caching on device queries (6 hours) and live metrics (60s) to eliminate redundant Garmin API calls during navigation/refresh.
+  - Added 5-minute cooldown timer (`_SYNC_COOLDOWN_SECONDS`) on `POST /sync` to prevent API spamming and protect accounts from HTTP 429 rate limiting.
+  - Added polite request throttling (0.3s backoff interval) inside `GarminExtractor` bulk history loops.
+- **Full OAuth Client State Persistence**:
+  - Upgraded `CffiStrategy` to serialize and store `garmin.client.dumps()` directly in `tokens.json`.
+  - Upgraded `GarminAPI` to seamlessly restore live authenticated sessions via `garmin.client.loads(client_state)` without re-triggering login flows.
+  - Added PM2 ecosystem config (`ecosystem.config.js`) for background service management.
+- **Native MCP (Model Context Protocol) Upgrades**:
+  - Added `get_garmin_devices` MCP tool to retrieve connected Garmin watch model, serial number, unit ID, and firmware.
+  - Added `get_live_metrics` MCP tool to provide AI agents with real-time biometric readings (Body Battery, Stress level & status, Steps, HR).
+  - Exposes 11 comprehensive MCP tools for AI assistants (Claude, Cursor, Antigravity/AGY).
+
+### 🐛 Bug Fixes
+- Fixed `NameError: name 'GarminAPI' is not defined` missing import inside `web/routes.py`.
+- Fixed session initialization bug where `_garmin_instance` failed to restore on subsequent API invocations without raw password inputs.
+
 ## [v0.1.0] - 2026-08-08
 
 ### 🚀 Features & Architecture

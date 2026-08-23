@@ -46,3 +46,7 @@ ENV/
 
 # Playwright cache
 .cache/
+
+# Graphify
+graphify-out/
+

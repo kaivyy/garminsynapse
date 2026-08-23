@@ -11,6 +11,7 @@ from garminsynapse.db.manager import DatabaseManager
 from garminsynapse.db.schema import Activity, Sleep, HRV, Stress, BodyBattery, UserProfile
 from garminsynapse.etl.extractor import GarminExtractor
 from garminsynapse.etl.processor import GarminProcessor
+from garminsynapse.core.api import GarminAPI
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -65,6 +66,140 @@ def logout():
     auth_mgr = DualAuthManager()
     auth_mgr.logout()
     return JSONResponse({"status": "success", "message": "Logged out successfully."})
+
+
+# In-memory caches to protect Garmin API from repeated hits
+_DEVICE_CACHE = {"data": None, "timestamp": 0}
+_DEVICE_CACHE_TTL = 3600 * 6  # 6 hours cache for hardware devices
+_LAST_SYNC_TIME = 0
+_SYNC_COOLDOWN_SECONDS = 300  # 5 minutes cooldown between manual syncs
+
+
+@router.get("/devices")
+def get_devices(force: bool = False):
+    """Fetch registered Garmin devices and primary watch info with smart caching."""
+    import time
+    now = time.time()
+    
+    # Return cached device data if valid and not forced
+    if not force and _DEVICE_CACHE["data"] and (now - _DEVICE_CACHE["timestamp"] < _DEVICE_CACHE_TTL):
+        return JSONResponse(_DEVICE_CACHE["data"])
+
+    api = GarminAPI()
+    try:
+        if api._garmin_instance:
+            devices = api._garmin_instance.get_devices()
+            primary = None
+            try:
+                primary = api._garmin_instance.get_primary_training_device()
+            except Exception:
+                pass
+            res_data = {
+                "status": "success",
+                "devices": devices or [],
+                "primary": primary
+            }
+            _DEVICE_CACHE["data"] = res_data
+            _DEVICE_CACHE["timestamp"] = now
+            return JSONResponse(res_data)
+        return JSONResponse({"status": "error", "message": "Not authenticated with Garmin", "devices": [], "primary": None})
+    except Exception as e:
+        logger.error(f"Failed to fetch devices: {e}")
+        # If cache exists on error, return stale cache
+        if _DEVICE_CACHE["data"]:
+            return JSONResponse(_DEVICE_CACHE["data"])
+        return JSONResponse({"status": "error", "message": str(e), "devices": [], "primary": None})
+
+
+_LIVE_CACHE = {"data": None, "timestamp": 0}
+_LIVE_CACHE_TTL = 60  # 60 seconds cache to be gentle with Garmin API
+
+
+@router.get("/live")
+def get_live_metrics():
+    """Fetch live/latest biometric readings for today (Body Battery, Stress, HR, Steps)."""
+    import time
+    now = time.time()
+    if _LIVE_CACHE["data"] and (now - _LIVE_CACHE["timestamp"] < _LIVE_CACHE_TTL):
+        return JSONResponse(_LIVE_CACHE["data"])
+
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return JSONResponse({"status": "error", "message": "Not authenticated with Garmin"})
+
+    g = api._garmin_instance
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    live_body_battery = None
+    bb_charged = None
+    bb_drained = None
+    live_stress = None
+    stress_status = None
+    live_hr = None
+    steps = None
+
+    # Body Battery
+    try:
+        bb = g.get_body_battery(today)
+        if isinstance(bb, list) and bb:
+            for item in bb:
+                if isinstance(item, dict):
+                    bb_charged = item.get("charged", bb_charged)
+                    bb_drained = item.get("drained", bb_drained)
+                    vals = item.get("bodyBatteryValuesArray", [])
+                    for pt in vals:
+                        if len(pt) > 1 and pt[1] is not None:
+                            live_body_battery = pt[1]
+    except Exception as e:
+        logger.debug(f"Live BB fetch error: {e}")
+
+    # Stress
+    try:
+        stress = g.get_stress_data(today)
+        if isinstance(stress, dict):
+            s_vals = stress.get("stressValuesArray", [])
+            for pt in s_vals:
+                if len(pt) > 1 and pt[1] is not None and pt[1] >= 0:
+                    live_stress = pt[1]
+            if live_stress is not None:
+                if live_stress <= 25:
+                    stress_status = "Rest"
+                elif live_stress <= 50:
+                    stress_status = "Low"
+                elif live_stress <= 75:
+                    stress_status = "Medium"
+                else:
+                    stress_status = "High"
+    except Exception as e:
+        logger.debug(f"Live stress fetch error: {e}")
+
+    # Daily Summary
+    try:
+        summary = g.get_user_summary(today)
+        if isinstance(summary, dict):
+            steps = summary.get("totalSteps")
+            live_hr = summary.get("restingHeartRate") or summary.get("minHeartRate")
+    except Exception:
+        pass
+
+    res_data = {
+        "status": "success",
+        "date": today,
+        "body_battery": live_body_battery,
+        "charged": bb_charged,
+        "drained": bb_drained,
+        "stress_level": live_stress,
+        "stress_status": stress_status,
+        "heart_rate": live_hr,
+        "steps": steps,
+        "last_updated": datetime.now().isoformat()
+    }
+    _LIVE_CACHE["data"] = res_data
+    _LIVE_CACHE["timestamp"] = now
+    return JSONResponse(res_data)
+
+
+
 
 
 @router.get("/summary")
@@ -224,15 +359,30 @@ def activity_details(activity_id: int):
 
 @router.post("/sync")
 def sync():
-    """Trigger manual data extraction sync."""
+    """Trigger manual data extraction sync with rate-limiting cooldown."""
+    global _LAST_SYNC_TIME
+    import time
+    now = time.time()
+    
+    # Enforce minimum cooldown between manual syncs
+    if now - _LAST_SYNC_TIME < _SYNC_COOLDOWN_SECONDS:
+        remaining = int(_SYNC_COOLDOWN_SECONDS - (now - _LAST_SYNC_TIME))
+        return JSONResponse({
+            "status": "cooldown",
+            "message": f"Sync rate limit protection active. Please wait {remaining} seconds before syncing again."
+        })
+
     auth_mgr = DualAuthManager()
     if not auth_mgr.get_active_tokens():
         return JSONResponse({"error": "unauthenticated"}, status_code=401)
 
     try:
+        _LAST_SYNC_TIME = now
         extractor = GarminExtractor()
-        extractor.extract_all(days=14)
+        extractor.extract_all(days=7)
         GarminProcessor().process_ingest_directory()
-        return JSONResponse({"status": "success", "message": "Extracted real Garmin Connect data into SQLite database."})
+        return JSONResponse({"status": "success", "message": "Extracted Garmin Connect data into SQLite database."})
     except Exception as e:
+        logger.error(f"Sync error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
