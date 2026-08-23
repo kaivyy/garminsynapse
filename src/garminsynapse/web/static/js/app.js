@@ -373,6 +373,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                 if (liveData.steps && !stepsNum) {
                                     stepsVal.textContent = liveData.steps.toLocaleString();
                                 }
+                                if (!summary.sleep_score) {
+                                    if (liveData.sleep_score) {
+                                        sleepScore.innerHTML = `${liveData.sleep_score} <span class="unit">/ 100</span>`;
+                                    } else if (liveData.nap_duration_mins) {
+                                        const h = Math.floor(liveData.nap_duration_mins / 60);
+                                        const m = liveData.nap_duration_mins % 60;
+                                        const napStr = (h > 0 ? `${h}h ` : '') + `${m}m`;
+                                        sleepScore.innerHTML = `${napStr} <span class="unit">(Nap)</span>`;
+                                    }
+                                }
                             }
                         }
                     } catch (liveErr) {

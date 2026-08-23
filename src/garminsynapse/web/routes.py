@@ -190,6 +190,24 @@ def get_live_metrics():
     except Exception:
         pass
 
+    # Sleep & Nap Data
+    sleep_score = None
+    sleep_duration_mins = None
+    nap_duration_mins = None
+    try:
+        sleep_data = g.get_sleep_data(today)
+        if isinstance(sleep_data, dict):
+            daily_dto = sleep_data.get("dailySleepDTO", {})
+            sleep_score = daily_dto.get("sleepScores", {}).get("overall", {}).get("value")
+            sleep_sec = daily_dto.get("sleepTimeSeconds")
+            if sleep_sec:
+                sleep_duration_mins = round(sleep_sec / 60)
+            nap_sec = daily_dto.get("napTimeSeconds")
+            if nap_sec:
+                nap_duration_mins = round(nap_sec / 60)
+    except Exception as sle:
+        logger.debug(f"Live sleep/nap error: {sle}")
+
     res_data = {
         "status": "success",
         "date": today,
@@ -200,6 +218,9 @@ def get_live_metrics():
         "stress_status": stress_status,
         "heart_rate": live_hr,
         "steps": steps,
+        "sleep_score": sleep_score,
+        "sleep_duration_mins": sleep_duration_mins,
+        "nap_duration_mins": nap_duration_mins,
         "last_updated": datetime.now().isoformat()
     }
     _LIVE_CACHE["data"] = res_data
