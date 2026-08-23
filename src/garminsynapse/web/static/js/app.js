@@ -401,7 +401,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // SpO2
                 spo2Val.innerHTML = summary.spo2 ? `${summary.spo2} <span class="unit">%</span>` : `-- <span class="unit">%</span>`;
+
+                // Training Readiness
+                try {
+                    const readyRes = await fetch('/api/v1/readiness');
+                    if (readyRes.ok) {
+                        const readyData = await readyRes.json();
+                        const readyVal = document.getElementById('readiness-value');
+                        const readySub = document.getElementById('readiness-subtext');
+                        if (readyData.status === 'success' && readyData.data) {
+                            const score = readyData.data.score || readyData.data.trainingReadiness || readyData.data.overallScore;
+                            if (score !== undefined && score !== null && readyVal) {
+                                readyVal.innerHTML = `${score} <span class="unit">/ 100</span>`;
+                            }
+                            if (readyData.data.feedback && readySub) {
+                                readySub.textContent = readyData.data.feedback;
+                            }
+                        }
+                    }
+                } catch (readyErr) {
+                    console.warn('Could not fetch training readiness:', readyErr);
+                }
             }
+
 
 
             // Activities

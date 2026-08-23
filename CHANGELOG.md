@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0] - 2026-08-23
+
+### 🚀 Major Features & Architectural Completion
+- **Full 20 Native MCP Tools Suite**:
+  - Added `get_training_readiness` (0–100 score with sleep recovery, HRV status, acute load).
+  - Added `get_race_predictions` (5K, 10K, Half Marathon, Marathon times).
+  - Added `get_earned_badges` (achievement trophies & challenge badges).
+  - Added `get_respiration_data` (waking & sleep brpm).
+  - Added `get_spo2_data` (Pulse Ox % daily time-series).
+  - Added `get_hydration_data` (daily water intake logs).
+  - Added `get_fitness_age` (calculated vs chronological age).
+  - Added `get_user_profile` (weight, height, gender, VO2 Max).
+- **Comprehensive ETL Pipeline Upgrades**:
+  - Implemented `DailySummary` relational table in SQLite schema with unique date constraints.
+  - Added JSON parsers for `_STATS.json` (steps, distance, calories, RHR), `_RESPIRATION.json`, and `_SPO2.json`.
+  - Added `user_profile.json` ingestion into `UserProfile` table.
+  - Implemented raw binary `.FIT` time-series frame parsing into `ActivityTsMetric` table using `fitdecode`.
+- **REST API & Web Dashboard Expansion**:
+  - Added `/api/v1/readiness`, `/api/v1/predictions`, `/api/v1/badges`, `/api/v1/profile` REST endpoints.
+  - Added **Training Readiness** gauge card to the web dashboard UI with live feedback status.
+  - Full relational aggregation for multi-day date range filtering in `/api/v1/summary`.
+
 ## [v0.2.4] - 2026-08-23
 
 ### 🚀 Features & Enhancements

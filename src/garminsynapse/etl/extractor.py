@@ -60,14 +60,24 @@ class GarminExtractor:
             # 6. Respiration Data
             self._save_endpoint_json(api, "get_respiration_data", date_str, f"{date_str}_RESPIRATION.json")
 
-            # 7. Training Status / Readiness
+            # 7. SpO2 (Pulse Ox)
+            self._save_endpoint_json(api, "get_spo2_data", date_str, f"{date_str}_SPO2.json")
+
+            # 8. Training Status & Readiness
             self._save_endpoint_json(api, "get_training_status", date_str, f"{date_str}_TRAINING_STATUS.json")
+            self._save_endpoint_json(api, "get_training_readiness", date_str, f"{date_str}_READINESS.json")
+
+            # 9. Hydration
+            self._save_endpoint_json(api, "get_hydration_data", date_str, f"{date_str}_HYDRATION.json")
+
+            # 10. Fitness Age
+            self._save_endpoint_json(api, "get_fitnessage_data", date_str, f"{date_str}_FITNESS_AGE.json")
 
             import time
             time.sleep(0.3)
             curr += timedelta(days=1)
 
-        # 8. User Profile
+        # 11. User Profile
         try:
             profile = api.get_user_profile()
             if profile:
@@ -76,7 +86,27 @@ class GarminExtractor:
         except Exception as e:
             logger.error(f"Failed to extract user profile: {e}")
 
-        # 9. Activities List
+        # 12. Race Predictions
+        try:
+            if hasattr(api, "get_race_predictions"):
+                predictions = api.get_race_predictions()
+                if predictions:
+                    with open(self.ingest_dir / "race_predictions.json", "w", encoding="utf-8") as f:
+                        json.dump(predictions, f, indent=2)
+        except Exception as e:
+            logger.debug(f"Failed to extract race predictions: {e}")
+
+        # 13. Earned Badges
+        try:
+            if hasattr(api, "get_earned_badges"):
+                badges = api.get_earned_badges()
+                if badges:
+                    with open(self.ingest_dir / "earned_badges.json", "w", encoding="utf-8") as f:
+                        json.dump(badges, f, indent=2)
+        except Exception as e:
+            logger.debug(f"Failed to extract earned badges: {e}")
+
+        # 14. Activities List
         try:
             activities = api.get_activities(start=0, limit=50)
             if activities:

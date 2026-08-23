@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from garminsynapse.auth.manager import DualAuthManager
 from garminsynapse.db.manager import DatabaseManager
-from garminsynapse.db.schema import Activity, Sleep, HRV, Stress, BodyBattery, UserProfile
+from garminsynapse.db.schema import Activity, Sleep, HRV, Stress, BodyBattery, UserProfile, DailySummary
 from garminsynapse.etl.extractor import GarminExtractor
 from garminsynapse.etl.processor import GarminProcessor
 from garminsynapse.core.api import GarminAPI
@@ -259,6 +259,17 @@ def summary(
         start_d = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
         end_d = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
 
+        # DailySummary query (Steps, RHR, SpO2, Respiration)
+        daily_q = session.query(DailySummary)
+        if start_d and end_d:
+            daily_q = daily_q.filter(DailySummary.calendar_date.between(start_d, end_d))
+        daily_rec = daily_q.order_by(DailySummary.calendar_date.desc()).first()
+        if daily_rec:
+            if daily_rec.steps is not None: steps = daily_rec.steps
+            if daily_rec.resting_hr is not None: resting_hr = daily_rec.resting_hr
+            if daily_rec.avg_respiration is not None: respiration_rate = daily_rec.avg_respiration
+            if daily_rec.avg_spo2 is not None: spo2 = daily_rec.avg_spo2
+
         # Sleep query
         sleep_q = session.query(Sleep)
         if start_d and end_d:
@@ -291,6 +302,11 @@ def summary(
         if battery_rec:
             body_battery = battery_rec.charged
 
+        # UserProfile query for VO2 Max
+        prof = session.query(UserProfile).filter_by(latest=True).first()
+        if prof:
+            vo2_max = prof.vo2_max_running or prof.vo2_max_cycling
+
     except Exception as e:
         logger.debug(f"Error querying summary metrics: {e}")
     finally:
@@ -309,6 +325,66 @@ def summary(
         "spo2": spo2,
         "vo2_max": vo2_max
     })
+
+
+@router.get("/readiness")
+def training_readiness(date_str: Optional[str] = None):
+    """Fetch Training Readiness score and recovery factor breakdown."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return JSONResponse({"status": "error", "message": "Not authenticated with Garmin"})
+    d = date_str or datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_training_readiness"):
+            res = api._garmin_instance.get_training_readiness(d)
+            return JSONResponse({"status": "success", "date": d, "data": res})
+        return JSONResponse({"status": "unavailable", "message": "Device not readiness capable"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)})
+
+
+@router.get("/predictions")
+def race_predictions():
+    """Fetch race predictions (5K, 10K, Half Marathon, Marathon) for user."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return JSONResponse({"status": "error", "message": "Not authenticated with Garmin"})
+    try:
+        if hasattr(api._garmin_instance, "get_race_predictions"):
+            res = api._garmin_instance.get_race_predictions()
+            return JSONResponse({"status": "success", "data": res})
+        return JSONResponse({"status": "unavailable", "message": "Race predictions not supported on this model"})
+    except Exception as e:
+        return JSONResponse({"status": "unavailable", "message": "No running activity recorded yet to compute race predictions"})
+
+
+
+@router.get("/badges")
+def badges():
+    """Fetch user's earned Garmin Connect badges & achievements."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return JSONResponse({"status": "error", "message": "Not authenticated with Garmin"})
+    try:
+        if hasattr(api._garmin_instance, "get_earned_badges"):
+            res = api._garmin_instance.get_earned_badges()
+            return JSONResponse({"status": "success", "data": res})
+        return JSONResponse({"status": "unavailable", "message": "Badges not available"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)})
+
+
+@router.get("/profile")
+def user_profile():
+    """Fetch Garmin social and biometric profile."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return JSONResponse({"status": "error", "message": "Not authenticated with Garmin"})
+    try:
+        res = api.get_user_profile()
+        return JSONResponse({"status": "success", "data": res})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)})
 
 
 @router.get("/activities")
@@ -414,4 +490,5 @@ def sync():
     except Exception as e:
         logger.error(f"Sync error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 

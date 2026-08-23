@@ -6,7 +6,7 @@ from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, Any, Optional
 from garminsynapse.db.manager import DatabaseManager
-from garminsynapse.db.schema import User, Activity, Sleep, HRV, Stress, BodyBattery
+from garminsynapse.db.schema import User, UserProfile, Activity, ActivityTsMetric, Sleep, HRV, Stress, BodyBattery, DailySummary
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +39,8 @@ class GarminProcessor:
             try:
                 if file_path.name == "activities_list.json":
                     self.process_activities_list(file_path)
+                elif file_path.name == "user_profile.json":
+                    self.process_user_profile(file_path)
                 else:
                     self.process_json_summary(file_path)
                 processed_count += 1
@@ -54,6 +56,53 @@ class GarminProcessor:
 
         return processed_count
 
+    def process_user_profile(self, json_path: Path) -> None:
+        """Parse user_profile.json and upsert into UserProfile table."""
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if not isinstance(data, dict):
+            return
+
+        session = self.db_manager.get_session()
+        try:
+            user_id = data.get("id") or data.get("userId", 0)
+            self._ensure_user_exists(session, user_id)
+            user_data = data.get("userData", {})
+
+            existing = session.query(UserProfile).filter_by(user_id=user_id, latest=True).first()
+            gender = user_data.get("gender")
+            weight = user_data.get("weight")
+            if weight and weight > 1000:
+                weight = round(weight / 1000, 2)  # Convert grams to kg
+            height = user_data.get("height")
+            vo2_run = user_data.get("vo2MaxRunning")
+            vo2_bike = user_data.get("vo2MaxCycling")
+
+            if existing:
+                existing.gender = gender
+                existing.weight = weight
+                existing.height = height
+                existing.vo2_max_running = vo2_run
+                existing.vo2_max_cycling = vo2_bike
+            else:
+                session.add(UserProfile(
+                    user_id=user_id,
+                    gender=gender,
+                    weight=weight,
+                    height=height,
+                    vo2_max_running=vo2_run,
+                    vo2_max_cycling=vo2_bike,
+                    latest=True
+                ))
+            session.commit()
+            logger.info(f"Processed UserProfile record for user {user_id}")
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to process user profile {json_path}: {e}")
+        finally:
+            session.close()
+
     def process_json_summary(self, json_path: Path) -> None:
         """Parse JSON health summary file and upsert records."""
         with open(json_path, "r", encoding="utf-8") as f:
@@ -66,7 +115,7 @@ class GarminProcessor:
 
             if "dailySleepDTO" in data:
                 sleep_dto = data["dailySleepDTO"]
-                user_id = sleep_dto.get("userId", 0)
+                user_id = sleep_dto.get("userProfilePK") or sleep_dto.get("userId", 0)
                 self._ensure_user_exists(session, user_id)
 
                 cal_str = cal_date_str or sleep_dto.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
@@ -80,25 +129,97 @@ class GarminProcessor:
                         sleep_score_val = overall.get("value")
 
                 existing_sleep = session.query(Sleep).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                nap_sec = sleep_dto.get("napTimeSeconds")
+
                 if existing_sleep:
                     existing_sleep.total_sleep_seconds = sleep_dto.get("sleepTimeSeconds")
                     existing_sleep.sleep_score = sleep_score_val
+                    if nap_sec is not None:
+                        existing_sleep.nap_seconds = nap_sec
                 else:
                     session.add(Sleep(
                         user_id=user_id,
                         calendar_date=parsed_date,
                         total_sleep_seconds=sleep_dto.get("sleepTimeSeconds"),
+                        nap_seconds=nap_sec,
                         sleep_score=sleep_score_val
                     ))
                 session.commit()
                 logger.info(f"Processed sleep JSON record for {parsed_date}")
 
+            elif "_STATS" in json_path.name and isinstance(data, dict):
+                user_id = data.get("userProfilePK") or data.get("userId", 0)
+                self._ensure_user_exists(session, user_id)
+                cal_str = cal_date_str or data.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
+                parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
+
+                existing = session.query(DailySummary).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                steps = data.get("totalSteps")
+                step_goal = data.get("dailyStepGoal", 10000)
+                dist = data.get("totalDistance")
+                rhr = data.get("restingHeartRate")
+                min_hr = data.get("minHeartRate")
+                max_hr = data.get("maxHeartRate")
+                cals = data.get("totalKilocalories")
+
+                if existing:
+                    if steps is not None: existing.steps = steps
+                    if step_goal is not None: existing.step_goal = step_goal
+                    if dist is not None: existing.total_distance_meters = dist
+                    if rhr is not None: existing.resting_hr = rhr
+                    if min_hr is not None: existing.min_hr = min_hr
+                    if max_hr is not None: existing.max_hr = max_hr
+                    if cals is not None: existing.total_calories = cals
+                else:
+                    session.add(DailySummary(
+                        user_id=user_id,
+                        calendar_date=parsed_date,
+                        steps=steps,
+                        step_goal=step_goal,
+                        total_distance_meters=dist,
+                        resting_hr=rhr,
+                        min_hr=min_hr,
+                        max_hr=max_hr,
+                        total_calories=cals
+                    ))
+                session.commit()
+                logger.info(f"Processed DailySummary record for {parsed_date}")
+
+            elif "_RESPIRATION" in json_path.name and isinstance(data, dict):
+                user_id = data.get("userProfilePK") or data.get("userId", 0)
+                self._ensure_user_exists(session, user_id)
+                cal_str = cal_date_str or data.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
+                parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
+
+                avg_resp = data.get("avgWakingRespirationValue") or data.get("avgSleepRespirationValue") or data.get("avgRespirationValue")
+                if avg_resp is not None:
+                    existing = session.query(DailySummary).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                    if existing:
+                        existing.avg_respiration = avg_resp
+                    else:
+                        session.add(DailySummary(user_id=user_id, calendar_date=parsed_date, avg_respiration=avg_resp))
+                    session.commit()
+
+            elif "_SPO2" in json_path.name and isinstance(data, dict):
+                user_id = data.get("userProfilePK") or data.get("userId", 0)
+                self._ensure_user_exists(session, user_id)
+                cal_str = cal_date_str or data.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
+                parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
+
+                avg_spo2 = data.get("averageSpO2") or data.get("averageSingleSpO2")
+                if avg_spo2 is not None:
+                    existing = session.query(DailySummary).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                    if existing:
+                        existing.avg_spo2 = avg_spo2
+                    else:
+                        session.add(DailySummary(user_id=user_id, calendar_date=parsed_date, avg_spo2=avg_spo2))
+                    session.commit()
+
             elif "_STRESS" in json_path.name and isinstance(data, dict):
-                user_id = data.get("userId", 0)
+                user_id = data.get("userProfilePK") or data.get("userId", 0)
                 self._ensure_user_exists(session, user_id)
                 cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
-                from garminsynapse.db.schema import Stress
                 existing = session.query(Stress).filter_by(user_id=user_id, calendar_date=parsed_date).first()
                 if existing:
                     existing.avg_stress_level = data.get("overallStressLevel")
@@ -110,11 +231,10 @@ class GarminProcessor:
                 session.commit()
 
             elif "_HRV" in json_path.name and isinstance(data, dict):
-                user_id = data.get("userId", 0)
+                user_id = data.get("userProfilePK") or data.get("userId", 0)
                 self._ensure_user_exists(session, user_id)
                 cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
-                from garminsynapse.db.schema import HRV
                 existing = session.query(HRV).filter_by(user_id=user_id, calendar_date=parsed_date).first()
                 summary = data.get("hrvSummary", data)
                 weekly = summary.get("weeklyAvg") if isinstance(summary, dict) else None
@@ -130,11 +250,10 @@ class GarminProcessor:
                 session.commit()
 
             elif "_HEART_RATE" in json_path.name and isinstance(data, dict):
-                user_id = data.get("userId", 0)
+                user_id = data.get("userProfilePK") or data.get("userId", 0)
                 self._ensure_user_exists(session, user_id)
                 cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
-                from garminsynapse.db.schema import BodyBattery
                 existing = session.query(BodyBattery).filter_by(user_id=user_id, calendar_date=parsed_date).first()
                 charged_val = data.get("bodyBatteryChargedValue")
                 drained_val = data.get("bodyBatteryDrainedValue")
@@ -197,14 +316,49 @@ class GarminProcessor:
             session.close()
 
     def process_fit_file(self, fit_path: Path) -> None:
-        """Parse binary FIT activity file using fitdecode."""
+        """Parse binary FIT activity file using fitdecode and store time series records."""
         try:
             import fitdecode
-            with fitdecode.FitReader(str(fit_path)) as fit:
-                for frame in fit:
-                    if frame.frame_type == fitdecode.FIT_FRAME_DATA:
-                        if frame.name == "record":
-                            pass
-            logger.info(f"Successfully processed FIT file {fit_path}")
+            act_id_match = re.search(r"(\d+)", fit_path.stem)
+            activity_id = int(act_id_match.group(1)) if act_id_match else None
+            if not activity_id:
+                return
+
+            session = self.db_manager.get_session()
+            records_added = 0
+            try:
+                with fitdecode.FitReader(str(fit_path)) as fit:
+                    for frame in fit:
+                        if frame.frame_type == fitdecode.FIT_FRAME_DATA and frame.name == "record":
+                            ts = frame.get_value("timestamp")
+                            if not ts:
+                                continue
+                            lat = frame.get_value("position_lat")
+                            lon = frame.get_value("position_long")
+                            # Convert semicircles to degrees if needed
+                            if lat and abs(lat) > 180: lat = lat * (180 / (2**31))
+                            if lon and abs(lon) > 180: lon = lon * (180 / (2**31))
+                            
+                            metric = ActivityTsMetric(
+                                activity_id=activity_id,
+                                timestamp=ts if isinstance(ts, datetime) else datetime.utcnow(),
+                                latitude=lat,
+                                longitude=lon,
+                                elevation=frame.get_value("enhanced_altitude") or frame.get_value("altitude"),
+                                heart_rate=frame.get_value("heart_rate"),
+                                speed=frame.get_value("enhanced_speed") or frame.get_value("speed"),
+                                cadence=frame.get_value("cadence"),
+                                power=frame.get_value("power")
+                            )
+                            session.merge(metric)
+                            records_added += 1
+                session.commit()
+                logger.info(f"Processed {records_added} time-series frames from FIT file {fit_path}")
+            except Exception as fe:
+                session.rollback()
+                logger.warning(f"Error parsing frames in {fit_path}: {fe}")
+            finally:
+                session.close()
         except Exception as e:
             logger.error(f"Failed to decode FIT file {fit_path}: {e}")
+

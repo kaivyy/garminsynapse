@@ -285,7 +285,7 @@ def download_fit_file(activity_id: int) -> Dict[str, Any]:
 
 @mcp.tool()
 def query_garmin_db(sql_query: str) -> List[Dict[str, Any]]:
-    """Execute a safe SELECT query on the local garmin_data.db SQLite relational database (40+ tables: user, activity, sleep, hrv, stress, body_battery, etc.)."""
+    """Execute a safe SELECT query on the local garmin_data.db SQLite relational database (40+ tables: user, activity, sleep, hrv, stress, body_battery, daily_summary, etc.)."""
     if not sql_query.strip().lower().startswith("select"):
         return [{"error": "Only SELECT queries are permitted."}]
 
@@ -297,3 +297,126 @@ def query_garmin_db(sql_query: str) -> List[Dict[str, Any]]:
             return [dict(zip(keys, row)) for row in res.fetchall()]
     except Exception as e:
         return [{"error": f"SQL execution failed: {str(e)}"}]
+
+
+@mcp.tool()
+def get_training_readiness(date_str: str = "") -> Dict[str, Any]:
+    """Get Training Readiness score (0-100) and recovery factors (sleep recovery, HRV status, acute load)."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    from datetime import datetime
+    d = date_str or datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_training_readiness"):
+            return {"status": "success", "date": d, "readiness": api._garmin_instance.get_training_readiness(d)}
+        return {"status": "unavailable", "message": "Device not readiness capable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_race_predictions() -> Dict[str, Any]:
+    """Get Garmin race time predictions for 5K, 10K, Half Marathon, and Marathon."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    try:
+        if hasattr(api._garmin_instance, "get_race_predictions"):
+            preds = api._garmin_instance.get_race_predictions()
+            return {"status": "success", "predictions": preds}
+        return {"status": "unavailable", "message": "Race predictions not supported on this model"}
+    except Exception as e:
+        return {"status": "unavailable", "message": "No running activity recorded yet to compute race predictions"}
+
+
+
+@mcp.tool()
+def get_earned_badges() -> Dict[str, Any]:
+    """Get user's earned Garmin Connect achievement badges and challenge trophies."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    try:
+        if hasattr(api._garmin_instance, "get_earned_badges"):
+            return {"status": "success", "badges": api._garmin_instance.get_earned_badges()}
+        return {"status": "unavailable", "message": "Badges not available"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_respiration_data(date_str: str = "") -> Dict[str, Any]:
+    """Get respiration rate (breaths per minute) waking and sleep averages for a specific date (YYYY-MM-DD)."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    from datetime import datetime
+    d = date_str or datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_respiration_data"):
+            return {"status": "success", "date": d, "respiration": api._garmin_instance.get_respiration_data(d)}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_spo2_data(date_str: str = "") -> Dict[str, Any]:
+    """Get blood oxygen saturation (SpO2 / Pulse Ox %) daily time-series and hourly averages."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    from datetime import datetime
+    d = date_str or datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_spo2_data"):
+            return {"status": "success", "date": d, "spo2": api._garmin_instance.get_spo2_data(d)}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_hydration_data(date_str: str = "") -> Dict[str, Any]:
+    """Get daily hydration and water intake (mL / oz) logs and target goals."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    from datetime import datetime
+    d = date_str or datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_hydration_data"):
+            return {"status": "success", "date": d, "hydration": api._garmin_instance.get_hydration_data(d)}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_fitness_age() -> Dict[str, Any]:
+    """Get Garmin calculated Fitness Age vs chronological age and improvement recommendations."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    from datetime import datetime
+    d = datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_fitnessage_data"):
+            return {"status": "success", "fitness_age": api._garmin_instance.get_fitnessage_data(d)}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_user_profile() -> Dict[str, Any]:
+    """Get authenticated user's social profile, biometric parameters (weight, height, gender), and VO2 Max."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    try:
+        return {"status": "success", "profile": api.get_user_profile()}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+

@@ -75,6 +75,7 @@ class Sleep(Base):
     light_sleep_seconds = Column(Integer)
     rem_sleep_seconds = Column(Integer)
     awake_seconds = Column(Integer)
+    nap_seconds = Column(Integer)
     sleep_score = Column(Integer)
 
 
@@ -107,3 +108,22 @@ class BodyBattery(Base):
     calendar_date = Column(Date, nullable=False)
     charged = Column(Integer)
     drained = Column(Integer)
+
+
+class DailySummary(Base):
+    __tablename__ = "daily_summary"
+    __table_args__ = (UniqueConstraint('user_id', 'calendar_date', name='uq_dailysummary_user_date'),)
+    summary_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("user.user_id"), nullable=False)
+    calendar_date = Column(Date, nullable=False)
+    steps = Column(Integer)
+    step_goal = Column(Integer)
+    total_distance_meters = Column(Float)
+    resting_hr = Column(Integer)
+    min_hr = Column(Integer)
+    max_hr = Column(Integer)
+    total_calories = Column(Integer)
+    avg_respiration = Column(Float)
+    avg_spo2 = Column(Float)
+    create_ts = Column(DateTime, default=datetime.utcnow, nullable=False)
+

@@ -184,16 +184,26 @@ In **Editor Settings** -> **Model Context Protocol (MCP)** -> **Add New Command*
 
 ---
 
-## 🛠️ MCP Tools Reference
+## 🛠️ MCP Tools Reference (20 Native AI Tools)
 
 | Tool Name | Parameters | Description |
 |---|---|---|
-| `garmin_status` | None | Check auth, database, and MCP status |
+| `garmin_status` | None | Check auth, database, and MCP system status |
 | `garmin_login` | `email`, `password` | Authenticate with Garmin Connect |
-| `garmin_sync` | `days` (default 7) | Extract recent Garmin metrics to SQLite |
-| `get_daily_summary` | `date_str` (`YYYY-MM-DD`) | Get daily steps, RHR, stress, body battery |
-| `get_sleep_analysis` | `date_str` (`YYYY-MM-DD`) | Get sleep stages, sleep score, SpO2 |
-| `get_hrv_trends` | `date_str` | Get HRV status and weekly baseline |
+| `get_garmin_devices` | None | Get registered watch model names, serial numbers, unit IDs, and firmware |
+| `get_live_metrics` | None | Get live point-in-time metrics (Body Battery %, charged/drained, Stress, Steps, Nap) |
+| `garmin_sync` | `days` (default 7) | Extract recent Garmin metrics to SQLite database |
+| `get_daily_summary` | `date_str` (`YYYY-MM-DD`) | Get daily steps, RHR, stress, body battery, calories, distance |
+| `get_sleep_analysis` | `date_str` (`YYYY-MM-DD`) | Get sleep stages, sleep score, and daytime nap intervals |
+| `get_training_readiness` | `date_str` (optional) | Get Training Readiness score (0–100) and recovery factors |
+| `get_race_predictions` | None | Get race time predictions for 5K, 10K, Half Marathon, and Marathon |
+| `get_earned_badges` | None | Get user's earned Garmin Connect achievement badges |
+| `get_hrv_trends` | `date_str` (optional) | Get HRV status, weekly baseline, and nightly averages |
+| `get_respiration_data` | `date_str` (optional) | Get waking and sleep respiration rates (brpm) |
+| `get_spo2_data` | `date_str` (optional) | Get blood oxygen saturation (SpO2 / Pulse Ox %) daily time-series |
+| `get_hydration_data` | `date_str` (optional) | Get daily water intake and hydration logs |
+| `get_fitness_age` | None | Get calculated Fitness Age vs chronological age |
+| `get_user_profile` | None | Get user social and biometric profile (weight, height, gender, VO2 Max) |
 | `list_activities` | `limit` (default 20) | List recent workouts (distance, duration, HR, calories) |
 | `get_activity_details` | `activity_id` | Get detailed time-series metrics & map polyline |
 | `download_fit_file` | `activity_id` | Download raw binary `.FIT` file to local storage |
@@ -208,9 +218,16 @@ In **Editor Settings** -> **Model Context Protocol (MCP)** -> **Add New Command*
 | `GET` | `/api/v1/status` | System health & authentication status |
 | `POST` | `/api/v1/auth/login` | Authenticate Garmin Connect account |
 | `POST` | `/api/v1/auth/logout` | Clear active token session |
-| `GET` | `/api/v1/summary` | Today's health gauges (Steps, HR, Sleep, Battery) |
-| `GET` | `/api/v1/activities` | List recent logged workouts |
-| `POST` | `/api/v1/sync` | Trigger manual data extraction |
+| `GET` | `/api/v1/devices` | Connected Garmin watch info with 6-hour cache |
+| `GET` | `/api/v1/live` | Live real-time biometric readings (Body Battery, Stress, Steps, Nap) |
+| `GET` | `/api/v1/summary` | Health gauges (Steps, HR, Sleep, Battery, HRV, SpO2, Respiration) |
+| `GET` | `/api/v1/readiness` | Training Readiness score & recovery factor breakdown |
+| `GET` | `/api/v1/predictions` | Race time predictions (5K, 10K, Half Marathon, Marathon) |
+| `GET` | `/api/v1/badges` | User's earned Garmin Connect achievement badges |
+| `GET` | `/api/v1/profile` | User social profile & biometric parameters |
+| `GET` | `/api/v1/activities` | List recent logged workouts with date filters |
+| `GET` | `/api/v1/activity/{id}` | Single activity full details |
+| `POST` | `/api/v1/sync` | Trigger manual data extraction (with 5-minute cooldown) |
 
 ---
 
