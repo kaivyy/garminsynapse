@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.4] - 2026-08-23
+
+### 🚀 Features & Enhancements
+- **MCP Server Upgrade**:
+  - Integrated `nap_duration_mins` directly into `get_live_metrics` MCP tool output.
+  - Enhanced `get_daily_summary` and `get_sleep_analysis` tools with automatic session restoration and step count fallback.
+
 ## [v0.2.3] - 2026-08-23
 
 ### 🚀 Features & Enhancements

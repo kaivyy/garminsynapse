@@ -118,6 +118,19 @@ def get_live_metrics() -> Dict[str, Any]:
     except Exception as e:
         logger.debug(f"MCP live steps error: {e}")
 
+    sleep_score = None
+    nap_mins = None
+    try:
+        sleep_data = g.get_sleep_data(today)
+        if isinstance(sleep_data, dict):
+            daily_dto = sleep_data.get("dailySleepDTO", {})
+            sleep_score = daily_dto.get("sleepScores", {}).get("overall", {}).get("value")
+            nap_sec = daily_dto.get("napTimeSeconds")
+            if nap_sec:
+                nap_mins = round(nap_sec / 60)
+    except Exception as e:
+        logger.debug(f"MCP live sleep error: {e}")
+
     return {
         "status": "success",
         "date": today,
@@ -126,8 +139,11 @@ def get_live_metrics() -> Dict[str, Any]:
         "charged": charged,
         "drained": drained,
         "stress_level": live_stress,
-        "stress_status": stress_status
+        "stress_status": stress_status,
+        "sleep_score": sleep_score,
+        "nap_duration_mins": nap_mins
     }
+
 
 
 
