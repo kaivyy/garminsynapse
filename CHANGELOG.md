@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.1] - 2026-08-24
+
+### 🐛 Bug Fixes & Stability
+- **Automated SQLite Schema Migrations**:
+  - Implemented automatic column migration in `DatabaseManager.init_db()` (`_migrate_columns()`) to auto-detect and add missing columns (such as `sleep.nap_seconds`) to pre-existing SQLite databases without requiring manual SQL queries.
+  - Successfully migrated and reprocessed all historical ingest files (16–23 August).
+- **Process Memory Threshold Upgrade**:
+  - Increased PM2 `max_memory_restart` limit from `500M` to `1G` in `ecosystem.config.js` to eliminate OOM restart cycles during high-throughput ETL sync batches.
+
 ## [v0.3.0] - 2026-08-23
 
 ### 🚀 Major Features & Architectural Completion

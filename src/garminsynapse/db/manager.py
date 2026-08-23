@@ -33,12 +33,28 @@ class DatabaseManager:
         self.init_db()
 
     def init_db(self) -> None:
-        """Create all tables and enforce foreign keys."""
+        """Create all tables, migrate columns, and enforce foreign keys."""
         with self.engine.connect() as conn:
             conn.execute(text("PRAGMA foreign_keys=ON;"))
             conn.commit()
         Base.metadata.create_all(bind=self.engine)
+        self._migrate_columns()
         logger.info(f"Initialized database schema at {self.db_path}")
+
+    def _migrate_columns(self) -> None:
+        """Automatically add any missing columns in existing SQLite tables."""
+        with self.engine.connect() as conn:
+            # Check sleep table for nap_seconds
+            try:
+                res = conn.execute(text("PRAGMA table_info(sleep);")).fetchall()
+                cols = {row[1] for row in res}
+                if cols and "nap_seconds" not in cols:
+                    conn.execute(text("ALTER TABLE sleep ADD COLUMN nap_seconds INTEGER;"))
+                    conn.commit()
+                    logger.info("Migrated SQLite schema: added sleep.nap_seconds column")
+            except Exception as e:
+                logger.warning(f"Sleep table migration check error: {e}")
+
 
     def get_session(self) -> Session:
         """Provide a new SQLAlchemy session."""
