@@ -173,11 +173,19 @@ def get_live_metrics():
     except Exception as e:
         logger.debug(f"Live stress fetch error: {e}")
 
-    # Daily Summary
+    # Daily Steps & Summary
+    try:
+        steps_list = g.get_daily_steps(today, today)
+        if steps_list and isinstance(steps_list, list):
+            steps = steps_list[0].get("totalSteps")
+    except Exception as se:
+        logger.debug(f"Live daily steps error: {se}")
+
     try:
         summary = g.get_user_summary(today)
         if isinstance(summary, dict):
-            steps = summary.get("totalSteps")
+            if steps is None:
+                steps = summary.get("totalSteps")
             live_hr = summary.get("restingHeartRate") or summary.get("minHeartRate")
     except Exception:
         pass

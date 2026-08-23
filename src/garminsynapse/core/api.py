@@ -85,7 +85,21 @@ class GarminAPI:
     def get_daily_stats(self, date_str: str) -> Dict[str, Any]:
         """Fetch daily health summary (steps, calories, HR)."""
         if self._garmin_instance:
-            return self._garmin_instance.get_user_summary(date_str)
+            try:
+                return self._garmin_instance.get_user_summary(date_str)
+            except Exception:
+                try:
+                    steps_list = self._garmin_instance.get_daily_steps(date_str, date_str)
+                    if steps_list and isinstance(steps_list, list):
+                        item = steps_list[0]
+                        return {
+                            "totalSteps": item.get("totalSteps", 0),
+                            "dailyStepGoal": item.get("stepGoal", 10000),
+                            "totalDistance": item.get("totalDistance", 0)
+                        }
+                except Exception:
+                    pass
+                return {}
         url = f"{self.base_url}/wellness-service/wellness/dailySummaryChart/{date_str}"
         resp = self.session.get(url)
         return resp.json() if resp.status_code == 200 else {}

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.2] - 2026-08-23
+
+### 🚀 Features & Enhancements
+- **Direct Daily Steps Integration**:
+  - Connected `get_daily_steps()` to `/api/v1/live` and MCP tool `get_live_metrics`, allowing step data to be pulled in real-time even for new Garmin accounts without a configured public display name.
+  - Added seamless fallback in `GarminAPI.get_daily_stats()` to retrieve actual step counts and step goals directly from user summary endpoints.
+
 ## [v0.2.1] - 2026-08-23
 
 ### 🚀 Features & Enhancements

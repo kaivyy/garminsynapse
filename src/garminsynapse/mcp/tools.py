@@ -110,15 +110,25 @@ def get_live_metrics() -> Dict[str, Any]:
     except Exception as e:
         logger.debug(f"MCP live stress error: {e}")
 
+    live_steps = None
+    try:
+        steps_list = g.get_daily_steps(today, today)
+        if steps_list and isinstance(steps_list, list):
+            live_steps = steps_list[0].get("totalSteps")
+    except Exception as e:
+        logger.debug(f"MCP live steps error: {e}")
+
     return {
         "status": "success",
         "date": today,
+        "steps": live_steps,
         "body_battery": live_bb,
         "charged": charged,
         "drained": drained,
         "stress_level": live_stress,
         "stress_status": stress_status
     }
+
 
 
 @mcp.tool()
