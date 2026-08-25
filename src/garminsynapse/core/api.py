@@ -51,6 +51,23 @@ class GarminAPI:
                     self._garmin_instance = g
                     if hasattr(g, "client") and hasattr(g.client, "session"):
                         self.session = g.client.session
+
+                    # Restore display_name after session restore.
+                    # client.loads() only restores HTTP session cookies/tokens
+                    # but does NOT call login(), so display_name stays None.
+                    # Many endpoints (sleep, heart_rates, user_summary) embed
+                    # display_name in the URL path and fail with 403 without it.
+                    if not g.display_name:
+                        try:
+                            prof = g.client.connectapi("/userprofile-service/socialProfile")
+                            if isinstance(prof, dict):
+                                g.display_name = prof.get("displayName")
+                                g.full_name = prof.get("fullName", "")
+                        except Exception as profile_err:
+                            # Fallback: use cached user_id from tokens
+                            g.display_name = cached.get("user_id")
+                            logger.warning(f"Could not fetch socialProfile for display_name, using cached value: {profile_err}")
+
                 except Exception as e:
                     logger.warning(f"Could not restore logged in Garmin instance from client_state: {e}")
             elif target_email and password:
