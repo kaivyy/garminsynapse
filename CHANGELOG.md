@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.2] - 2026-08-25
+
+### 🐛 Bug Fixes
+
+- **Critical Sync Fix — `display_name` Restoration After Session Restore** (`core/api.py`):
+  - Fixed a root-cause bug where `GarminAPI` restored a Garmin session from `client_state` via `client.loads()` but left `display_name` as `None`, because `login()` (which fetches `/socialProfile`) was never called during session restore.
+  - This caused all API endpoints that interpolate `display_name` into their URL path to silently fail with `403 Forbidden`:
+    - **Sleep data** (`get_sleep_data`) → `/dailySleepData/None` → 403
+    - **Heart rates** (`get_heart_rates`) → `/heartrates/None` → 403
+    - **Daily summary** (`get_user_summary`) → `_require_display_name()` raises `GarminConnectConnectionError`
+    - **Resting HR** (`get_rhr`) → `_require_display_name()` raises error
+    - **Personal records** (`get_personal_records`) → `/records/None` → 403
+  - Endpoints that don't use `display_name` (stress, HRV, body battery, steps, activities) were unaffected and appeared to work, masking the bug.
+  - **Fix**: After `g.client.loads(client_state)`, now immediately fetches `/userprofile-service/socialProfile` to populate `g.display_name` and `g.full_name`. Falls back to cached `user_id` from `tokens.json` if the profile API call fails.
+  - Fix propagates automatically to **all callers**: MCP tools, Web Dashboard routes, ETL extractor, and CLI sync — no separate updates needed.
+
 ## [v0.3.1] - 2026-08-24
 
 ### 🐛 Bug Fixes & Stability
