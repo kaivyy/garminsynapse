@@ -492,3 +492,27 @@ def sync():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+@router.get("/activities/{activity_id}/splits")
+def get_activity_splits_route(activity_id: int):
+    """Get per-km or per-lap splits for a specific activity."""
+    auth_mgr = DualAuthManager()
+    tokens = auth_mgr.get_active_tokens()
+    if not tokens:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+    
+    headers = {}
+    if "access_token" in tokens:
+        headers["Authorization"] = f"Bearer {tokens['access_token']}"
+    elif "cookies" in tokens:
+        headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+        
+    api = GarminAPI(session_headers=headers)
+    try:
+        data = api.get_activity_splits(activity_id)
+        return data
+    except Exception as e:
+        logger.error(f"Error fetching splits for activity {activity_id}: {e}")
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": str(e)}, status_code=500)

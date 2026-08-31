@@ -261,6 +261,24 @@ def get_activity_details(activity_id: int) -> Dict[str, Any]:
 
 
 @mcp.tool()
+def get_activity_splits(activity_id: int) -> Dict[str, Any]:
+    """Get per-km or per-lap metrics (splits) like HR, pace, and duration for an activity."""
+    auth_mgr = DualAuthManager()
+    tokens = auth_mgr.get_active_tokens()
+    if not tokens:
+        return {"error": "unauthenticated"}
+
+    headers = {}
+    if "access_token" in tokens:
+        headers["Authorization"] = f"Bearer {tokens['access_token']}"
+    elif "cookies" in tokens:
+        headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+
+    api = GarminAPI(session_headers=headers)
+    return api.get_activity_splits(activity_id)
+
+
+@mcp.tool()
 def download_fit_file(activity_id: int) -> Dict[str, Any]:
     """Download raw binary .FIT file for a specific activity."""
     auth_mgr = DualAuthManager()

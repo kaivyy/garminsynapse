@@ -158,6 +158,19 @@ class GarminAPI:
         return resp.json() if resp.status_code == 200 else {}
 
     @with_auto_retry
+    def get_activity_splits(self, activity_id: int) -> Dict[str, Any]:
+        """Fetch per-km / per-lap splits for an activity."""
+        if self._garmin_instance:
+            # garminconnect library has get_activity_splits but uses a different URL or property, we'll try it
+            try:
+                return self._garmin_instance.get_activity_splits(activity_id)
+            except AttributeError:
+                pass # fallback to manual HTTP
+        url = f"{self.base_url}/activity-service/activity/{activity_id}/splits"
+        resp = self.session.get(url)
+        return {"splits": resp.json()} if resp.status_code == 200 else {"splits": []}
+
+    @with_auto_retry
     def download_activity_fit(self, activity_id: int) -> bytes:
         """Download raw binary FIT file for an activity."""
         if self._garmin_instance:
