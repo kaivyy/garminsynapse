@@ -173,9 +173,11 @@ h1, h2, h3 { font-family: var(--font-heading); letter-spacing: -0.5px; }
     backdrop-filter: blur(16px);
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     z-index: 200;
-    padding: 20px;
+    padding: 40px 20px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .modal-card {
@@ -183,8 +185,7 @@ h1, h2, h3 { font-family: var(--font-heading); letter-spacing: -0.5px; }
     padding: 36px;
     box-shadow: var(--shadow-float);
     animation: modalIn 0.35s ease;
-    max-height: 90vh;
-    overflow-y: auto;
+    margin: auto;
 }
 
 .login-card { max-width: 420px; }
