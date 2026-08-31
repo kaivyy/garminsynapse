@@ -502,11 +502,12 @@ def get_activity_splits_route(activity_id: int):
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": "unauthenticated"}, status_code=401)
     
-    headers = {}
-    if "access_token" in tokens:
-        headers["Authorization"] = f"Bearer {tokens['access_token']}"
-    elif "cookies" in tokens:
-        headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+    headers = tokens.get("headers", {})
+    if not headers:
+        if "access_token" in tokens:
+            headers["Authorization"] = f"Bearer {tokens['access_token']}"
+        elif "cookies" in tokens:
+            headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
         
     api = GarminAPI(session_headers=headers)
     try:

@@ -168,11 +168,12 @@ def get_daily_summary(date_str: str) -> Dict[str, Any]:
     if not tokens:
         return {"error": "unauthenticated", "message": "Please call garmin_login first."}
 
-    headers = {}
-    if "access_token" in tokens:
-        headers["Authorization"] = f"Bearer {tokens['access_token']}"
-    elif "cookies" in tokens:
-        headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+    headers = tokens.get("headers", {})
+    if not headers:
+        if "access_token" in tokens:
+            headers["Authorization"] = f"Bearer {tokens['access_token']}"
+        elif "cookies" in tokens:
+            headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
 
     api = GarminAPI(session_headers=headers)
     return api.get_daily_stats(date_str)
@@ -186,11 +187,12 @@ def get_sleep_analysis(date_str: str) -> Dict[str, Any]:
     if not tokens:
         return {"error": "unauthenticated"}
 
-    headers = {}
-    if "access_token" in tokens:
-        headers["Authorization"] = f"Bearer {tokens['access_token']}"
-    elif "cookies" in tokens:
-        headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+    headers = tokens.get("headers", {})
+    if not headers:
+        if "access_token" in tokens:
+            headers["Authorization"] = f"Bearer {tokens['access_token']}"
+        elif "cookies" in tokens:
+            headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
 
     api = GarminAPI(session_headers=headers)
     return api.get_sleep_data(date_str)
@@ -204,11 +206,12 @@ def get_hrv_trends(date_str: str = "") -> Dict[str, Any]:
     if not tokens:
         return {"error": "unauthenticated"}
 
-    headers = {}
-    if "access_token" in tokens:
-        headers["Authorization"] = f"Bearer {tokens['access_token']}"
-    elif "cookies" in tokens:
-        headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+    headers = tokens.get("headers", {})
+    if not headers:
+        if "access_token" in tokens:
+            headers["Authorization"] = f"Bearer {tokens['access_token']}"
+        elif "cookies" in tokens:
+            headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
 
     api = GarminAPI(session_headers=headers)
     if hasattr(api, "get_hrv_data"):
@@ -250,11 +253,12 @@ def get_activity_details(activity_id: int) -> Dict[str, Any]:
     if not tokens:
         return {"error": "unauthenticated"}
 
-    headers = {}
-    if "access_token" in tokens:
-        headers["Authorization"] = f"Bearer {tokens['access_token']}"
-    elif "cookies" in tokens:
-        headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+    headers = tokens.get("headers", {})
+    if not headers:
+        if "access_token" in tokens:
+            headers["Authorization"] = f"Bearer {tokens['access_token']}"
+        elif "cookies" in tokens:
+            headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
 
     api = GarminAPI(session_headers=headers)
     return api.get_activity_details(activity_id)
@@ -268,11 +272,12 @@ def get_activity_splits(activity_id: int) -> Dict[str, Any]:
     if not tokens:
         return {"error": "unauthenticated"}
 
-    headers = {}
-    if "access_token" in tokens:
-        headers["Authorization"] = f"Bearer {tokens['access_token']}"
-    elif "cookies" in tokens:
-        headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+    headers = tokens.get("headers", {})
+    if not headers:
+            if "access_token" in tokens:
+                headers["Authorization"] = f"Bearer {tokens['access_token']}"
+            elif "cookies" in tokens:
+                headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
 
     api = GarminAPI(session_headers=headers)
     return api.get_activity_splits(activity_id)
@@ -286,11 +291,12 @@ def download_fit_file(activity_id: int) -> Dict[str, Any]:
     if not tokens:
         return {"error": "unauthenticated"}
 
-    headers = {}
-    if "access_token" in tokens:
-        headers["Authorization"] = f"Bearer {tokens['access_token']}"
-    elif "cookies" in tokens:
-        headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+    headers = tokens.get("headers", {})
+    if not headers:
+        if "access_token" in tokens:
+            headers["Authorization"] = f"Bearer {tokens['access_token']}"
+        elif "cookies" in tokens:
+            headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
 
     api = GarminAPI(session_headers=headers)
     fit_bytes = api.download_activity_fit(activity_id)
