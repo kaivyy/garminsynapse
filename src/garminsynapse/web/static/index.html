@@ -98,6 +98,26 @@
                     <span class="detail-val" id="modal-act-calories">--</span>
                 </div>
             </div>
+            
+            <div class="modal-splits-section" style="margin-top: 1.5rem; display: none;" id="splits-container">
+                <h3 style="font-size: 1rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Splits / Laps</h3>
+                <div class="table-container glass" style="max-height: 250px; overflow-y: auto;">
+                    <table class="activities-table" style="font-size: 0.85rem;">
+                        <thead>
+                            <tr>
+                                <th>Lap</th>
+                                <th>Time</th>
+                                <th>Pace</th>
+                                <th>Avg HR</th>
+                                <th>Elev</th>
+                            </tr>
+                        </thead>
+                        <tbody id="splits-table-body">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 

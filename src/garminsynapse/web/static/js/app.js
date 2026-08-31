@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td>${act.calories || '--'} kcal</td>
                         <td><span class="green-text">✓ Synced</span></td>
                     `;
-                    row.addEventListener('click', () => openActivityModal(act.id));
+                    row.addEventListener('click', () => openActivityModal(act));
                     activityTableBody.appendChild(row);
                 });
             }
@@ -462,20 +462,52 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================
     // Activity Detail Modal Opener
     // ============================================================
-    async function openActivityModal(activityId) {
+    async function openActivityModal(act) {
         try {
-            const res = await fetch(`/api/v1/activity/${activityId}`);
+            // Populate basic info from row data
+            modalActName.textContent = act.name || 'Workout Details';
+            modalActType.textContent = act.type || 'Activity';
+            modalActTime.textContent = act.start_ts || '--';
+            modalActDuration.textContent = act.duration ? `${act.duration}` : '--';
+            modalActDistance.textContent = act.distance ? `${act.distance} km` : '--';
+            modalActAvgHr.textContent = act.avg_hr ? `${act.avg_hr} bpm` : '--';
+            modalActMaxHr.textContent = act.max_hr ? `${act.max_hr} bpm` : '--';
+            modalActCalories.textContent = act.calories ? `${act.calories} kcal` : '--';
+            activityModal.classList.remove('hidden');
+
+            const splitsContainer = document.getElementById('splits-container');
+            const splitsTableBody = document.getElementById('splits-table-body');
+            splitsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading splits...</td></tr>';
+            splitsContainer.style.display = 'block';
+
+            // Fetch splits data
+            const res = await fetch(`/api/v1/activities/${act.id}/splits`);
             if (res.ok) {
                 const data = await res.json();
-                modalActName.textContent = data.name || 'Workout Details';
-                modalActType.textContent = data.type || 'Activity';
-                modalActTime.textContent = data.start_ts || '--';
-                modalActDuration.textContent = data.duration_sec ? `${Math.round(data.duration_sec / 60)} minutes` : '--';
-                modalActDistance.textContent = data.distance_m ? `${(data.distance_m / 1000).toFixed(2)} km` : '--';
-                modalActAvgHr.textContent = data.avg_hr ? `${data.avg_hr} bpm` : '--';
-                modalActMaxHr.textContent = data.max_hr ? `${data.max_hr} bpm` : '--';
-                modalActCalories.textContent = data.calories ? `${data.calories} kcal` : '--';
-                activityModal.classList.remove('hidden');
+                splitsTableBody.innerHTML = '';
+                
+                if (data.splits && data.splits.length > 0) {
+                    data.splits.forEach(split => {
+                        const tr = document.createElement('tr');
+                        const speed = split.averageSpeed ? (1000 / split.averageSpeed / 60) : 0; // pace in min/km
+                        const paceMin = Math.floor(speed);
+                        const paceSec = Math.round((speed - paceMin) * 60).toString().padStart(2, '0');
+                        const paceStr = speed > 0 ? `${paceMin}:${paceSec}/km` : '--';
+                        
+                        tr.innerHTML = `
+                            <td>${split.splitIndex || split.lapIndex || '-'}</td>
+                            <td>${split.duration ? (split.duration / 60).toFixed(1) + 'm' : '--'}</td>
+                            <td>${paceStr}</td>
+                            <td>${split.averageHR || '--'} bpm</td>
+                            <td>${split.endElevation ? split.endElevation.toFixed(0) + 'm' : '--'}</td>
+                        `;
+                        splitsTableBody.appendChild(tr);
+                    });
+                } else {
+                    splitsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No splits/laps data available.</td></tr>';
+                }
+            } else {
+                splitsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--alert-color);">Failed to load splits.</td></tr>';
             }
         } catch (err) {
             console.error('Failed to load activity details:', err);

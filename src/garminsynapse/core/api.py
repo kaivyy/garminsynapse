@@ -161,11 +161,15 @@ class GarminAPI:
     def get_activity_splits(self, activity_id: int) -> Dict[str, Any]:
         """Fetch per-km / per-lap splits for an activity."""
         if self._garmin_instance:
-            # garminconnect library has get_activity_splits but uses a different URL or property, we'll try it
             try:
-                return self._garmin_instance.get_activity_splits(activity_id)
+                data = self._garmin_instance.get_activity_splits(activity_id)
+                # garminconnect returns {"activityId": ..., "lapDTOs": [...]}
+                if isinstance(data, dict) and "lapDTOs" in data:
+                    return {"splits": data["lapDTOs"]}
+                return {"splits": data} if isinstance(data, list) else {"splits": []}
             except AttributeError:
-                pass # fallback to manual HTTP
+                pass
+                
         url = f"{self.base_url}/activity-service/activity/{activity_id}/splits"
         resp = self.session.get(url)
         return {"splits": resp.json()} if resp.status_code == 200 else {"splits": []}
