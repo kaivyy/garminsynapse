@@ -183,6 +183,8 @@ h1, h2, h3 { font-family: var(--font-heading); letter-spacing: -0.5px; }
     padding: 36px;
     box-shadow: var(--shadow-float);
     animation: modalIn 0.35s ease;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .login-card { max-width: 420px; }
