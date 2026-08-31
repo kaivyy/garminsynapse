@@ -492,22 +492,45 @@ document.addEventListener('DOMContentLoaded', () => {
                         const speed = split.averageSpeed ? (1000 / split.averageSpeed / 60) : 0; // pace in min/km
                         const paceMin = Math.floor(speed);
                         const paceSec = Math.round((speed - paceMin) * 60).toString().padStart(2, '0');
-                        const paceStr = speed > 0 ? `${paceMin}:${paceSec}/km` : '--';
+                        const paceStr = speed > 0 ? `${paceMin}:${paceSec}` : '--';
                         
+                        // Format Time as MM:SS
+                        let timeStr = '--';
+                        if (split.duration) {
+                            const tMin = Math.floor(split.duration / 60);
+                            const tSec = Math.round(split.duration % 60).toString().padStart(2, '0');
+                            timeStr = `${tMin}:${tSec}`;
+                        }
+                        
+                        // Format Dist as KM
+                        const distStr = split.distance ? (split.distance / 1000).toFixed(2) : '--';
+
+                        // Elevation Gain
+                        const elevStr = split.elevationGain !== undefined ? `+${split.elevationGain.toFixed(0)}m` : '--';
+                        
+                        // Cadence
+                        const cadenceStr = split.averageRunCadence ? Math.round(split.averageRunCadence) : '--';
+                        
+                        // HR
+                        const hrStr = split.averageHR ? `${Math.round(split.averageHR)}` : '--';
+                        const hrMaxStr = split.maxHR ? ` <span style="color:var(--text-muted);font-size:0.8em">(${Math.round(split.maxHR)})</span>` : '';
+
                         tr.innerHTML = `
                             <td>${split.splitIndex || split.lapIndex || '-'}</td>
-                            <td>${split.duration ? (split.duration / 60).toFixed(1) + 'm' : '--'}</td>
+                            <td>${distStr}</td>
+                            <td style="font-weight: 500;">${timeStr}</td>
                             <td>${paceStr}</td>
-                            <td>${split.averageHR || '--'} bpm</td>
-                            <td>${split.endElevation ? split.endElevation.toFixed(0) + 'm' : '--'}</td>
+                            <td>${hrStr}${hrMaxStr}</td>
+                            <td>${cadenceStr}</td>
+                            <td>${elevStr}</td>
                         `;
                         splitsTableBody.appendChild(tr);
                     });
                 } else {
-                    splitsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No splits/laps data available.</td></tr>';
+                    splitsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No splits/laps data available.</td></tr>';
                 }
             } else {
-                splitsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--alert-color);">Failed to load splits.</td></tr>';
+                splitsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--alert-color);">Failed to load splits.</td></tr>';
             }
         } catch (err) {
             console.error('Failed to load activity details:', err);
