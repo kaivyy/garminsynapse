@@ -167,12 +167,21 @@ class GarminAPI:
                 if isinstance(data, dict) and "lapDTOs" in data:
                     return {"splits": data["lapDTOs"]}
                 return {"splits": data} if isinstance(data, list) else {"splits": []}
-            except AttributeError:
+            except Exception as e:
+                # Catch AttributeError or GarminConnectConnectionError (e.g. 404 if no splits exist)
+                if "404" in str(e) or "204" in str(e):
+                    return {"splits": []}
+                # Fall through to manual HTTP request
                 pass
                 
         url = f"{self.base_url}/activity-service/activity/{activity_id}/splits"
-        resp = self.session.get(url)
-        return {"splits": resp.json()} if resp.status_code == 200 else {"splits": []}
+        try:
+            resp = self.session.get(url)
+            if resp.status_code == 200 and resp.text:
+                return {"splits": resp.json().get("lapDTOs", resp.json()) if isinstance(resp.json(), dict) else resp.json()}
+        except Exception:
+            pass
+        return {"splits": []}
 
     @with_auto_retry
     def download_activity_fit(self, activity_id: int) -> bytes:
