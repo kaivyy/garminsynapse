@@ -23,6 +23,7 @@ class DualAuthManager:
             tokens = self.cffi_auth.login(email, password, prompt_mfa=prompt_mfa)
             if tokens:
                 self.token_manager.save_tokens(tokens)
+                self.token_manager.save_credentials(email, password)
                 return tokens
         except Exception as e:
             logger.warning(f"Primary curl_cffi login failed: {e}. Falling back to Playwright...")
@@ -41,6 +42,7 @@ class DualAuthManager:
             tokens = asyncio.run(self.playwright_auth.login_with_browser(email, password))
         if tokens:
             self.token_manager.save_tokens(tokens)
+            self.token_manager.save_credentials(email, password)
             return tokens
 
         raise RuntimeError("Authentication failed with all strategies (curl_cffi & Playwright).")
@@ -48,6 +50,19 @@ class DualAuthManager:
     def get_active_tokens(self) -> Optional[Dict[str, Any]]:
         """Load active tokens from disk."""
         return self.token_manager.load_tokens()
+        
+    def auto_login(self) -> Optional[Dict[str, Any]]:
+        """Attempt to automatically log in using saved credentials."""
+        creds = self.token_manager.load_credentials()
+        if not creds:
+            logger.warning("No saved credentials for auto-login.")
+            return None
+        logger.info(f"Auto-login triggered for {creds['email']}...")
+        try:
+            return self.login(creds['email'], creds['password'])
+        except Exception as e:
+            logger.error(f"Auto-login failed: {e}")
+            return None
 
     def logout(self) -> None:
         """Clear tokens from disk."""

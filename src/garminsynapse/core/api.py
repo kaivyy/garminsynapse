@@ -67,6 +67,16 @@ class GarminAPI:
                             # Fallback: use cached user_id from tokens
                             g.display_name = cached.get("user_id")
                             logger.warning(f"Could not fetch socialProfile for display_name, using cached value: {profile_err}")
+                            if "401" in str(profile_err) or "403" in str(profile_err):
+                                logger.info("Token appears expired, attempting auto-login...")
+                                from garminsynapse.auth.manager import DualAuthManager
+                                auth_mgr = DualAuthManager()
+                                new_tokens = auth_mgr.auto_login()
+                                if new_tokens and "client_state" in new_tokens:
+                                    g.client.loads(new_tokens["client_state"])
+                                    if hasattr(g, "client") and hasattr(g.client, "session"):
+                                        self.session = g.client.session
+                                    logger.info("Auto-login successful, session restored.")
 
                 except Exception as e:
                     logger.warning(f"Could not restore logged in Garmin instance from client_state: {e}")
