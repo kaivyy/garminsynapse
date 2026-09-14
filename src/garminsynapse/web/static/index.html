@@ -599,6 +599,34 @@
                     </table>
                 </div>
             </div>
+
+            <div class="modal-corrections-section" id="corrections-container">
+                <h3 class="splits-title">Activity Type</h3>
+                <div class="corrections-row">
+                    <select id="activity-type-select" class="corrections-select">
+                        <option value="">Loading types…</option>
+                    </select>
+                    <button id="apply-type-btn" class="btn-secondary">Change Type</button>
+                    <span id="type-change-status" class="corrections-status"></span>
+                </div>
+
+                <h3 class="splits-title">Outlier Detection &amp; Correction</h3>
+                <p class="modal-subtext">
+                    Detects altitude/depth samples that deviate sharply from this activity's own
+                    median (works for lakes at altitude and tidal water sports, not just sea level),
+                    and GPS "location hop" spikes. Applying a fix deletes and re-uploads the
+                    activity on Garmin Connect (new activity ID; a backup of the original is kept
+                    locally).
+                </p>
+                <div class="corrections-row">
+                    <button id="preview-corrections-btn" class="btn-secondary">Check for Outliers</button>
+                    <span id="corrections-status" class="corrections-status"></span>
+                </div>
+                <ul id="corrections-findings" class="corrections-findings hidden"></ul>
+                <div class="corrections-row hidden" id="apply-corrections-row">
+                    <button id="apply-corrections-btn" class="btn-danger">Apply Fix (Delete &amp; Re-upload)</button>
+                </div>
+            </div>
         </div>
     </div>
 

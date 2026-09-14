@@ -12,6 +12,7 @@ from garminsynapse.db.schema import Activity, Sleep, HRV, Stress, BodyBattery, U
 from garminsynapse.etl.extractor import GarminExtractor
 from garminsynapse.etl.processor import GarminProcessor
 from garminsynapse.core.api import GarminAPI
+from garminsynapse.core import activity_corrections
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,6 +33,24 @@ class LoginRequest(BaseModel):
     email: str
     password: Optional[str] = None
     mfa_code: Optional[str] = None
+
+
+class ChangeActivityTypeRequest(BaseModel):
+    type_key: str
+
+
+class ApplyCorrectionsRequest(BaseModel):
+    confirm: bool = False
+
+
+def _authed_api() -> Optional[GarminAPI]:
+    """Return an authenticated GarminAPI, or None if no active session."""
+    auth_mgr = DualAuthManager()
+    tokens = auth_mgr.get_active_tokens(auto_refresh=True)
+    if not tokens:
+        return None
+    headers = tokens.get("headers", {})
+    return GarminAPI(session_headers=headers)
 
 
 @router.get("/status")
@@ -655,3 +674,71 @@ def get_activity_splits_route(activity_id: int):
         logger.error(f"Error fetching splits for activity {activity_id}: {e}")
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/activity-types")
+def list_activity_types_route():
+    """List the catalog of valid Garmin Connect activity types (for type-change dropdowns)."""
+    api = _authed_api()
+    if not api:
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+    try:
+        types = api.get_activity_types()
+        return JSONResponse({"types": types})
+    except Exception as e:
+        logger.error(f"Error fetching activity types: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/activity/{activity_id}/type")
+def change_activity_type_route(activity_id: int, req: ChangeActivityTypeRequest):
+    """Reclassify an activity's sport type (e.g. mislabeled hike -> 'hiking')."""
+    api = _authed_api()
+    if not api:
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+    try:
+        result = api.change_activity_type(activity_id, req.type_key)
+        return JSONResponse({"status": "success", "activity_id": activity_id, "result": result})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error changing type for activity {activity_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/activity/{activity_id}/corrections/preview")
+def preview_activity_corrections_route(activity_id: int):
+    """Detect outliers (altitude/depth, GPS location hops) in an activity's
+    raw FIT data WITHOUT modifying or uploading anything."""
+    api = _authed_api()
+    if not api:
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+    try:
+        result = activity_corrections.preview_corrections(api, activity_id)
+        return JSONResponse(result)
+    except Exception as e:
+        logger.error(f"Error previewing corrections for activity {activity_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/activity/{activity_id}/corrections/apply")
+def apply_activity_corrections_route(activity_id: int, req: ApplyCorrectionsRequest):
+    """Correct detected outliers and replace the activity on Garmin Connect.
+
+    Destructive: deletes the original activity and uploads a corrected
+    replacement (new activity ID; comments/kudos on the original are lost).
+    The original FIT file is always backed up locally first. Requires
+    `confirm: true` in the request body -- callers must show the user a
+    `/corrections/preview` result and obtain explicit confirmation first.
+    """
+    if not req.confirm:
+        raise HTTPException(status_code=400, detail="confirm=true is required to apply corrections")
+    api = _authed_api()
+    if not api:
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+    try:
+        result = activity_corrections.apply_corrections(api, activity_id, confirm=True)
+        return JSONResponse(result)
+    except Exception as e:
+        logger.error(f"Error applying corrections for activity {activity_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

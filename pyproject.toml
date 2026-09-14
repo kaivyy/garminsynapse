@@ -19,6 +19,7 @@ dependencies = [
     "playwright",
     "fitdecode",
     "defusedxml",
+    "garmin-fit-sdk",
 ]
 
 [project.optional-dependencies]

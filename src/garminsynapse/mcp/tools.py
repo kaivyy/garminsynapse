@@ -8,6 +8,7 @@ from garminsynapse.auth.manager import DualAuthManager
 from garminsynapse.db.manager import DatabaseManager
 from garminsynapse.db.schema import Activity
 from garminsynapse.core.api import GarminAPI
+from garminsynapse.core import activity_corrections
 from garminsynapse.etl.extractor import GarminExtractor
 from garminsynapse.etl.processor import GarminProcessor
 
@@ -324,6 +325,66 @@ def download_fit_file(activity_id: int) -> Dict[str, Any]:
     with open(out_file, "wb") as f:
         f.write(fit_bytes)
     return {"status": "success", "file_path": str(out_file), "size_bytes": len(fit_bytes)}
+
+
+def _authed_api_for_mcp():
+    """Shared helper: return an authenticated GarminAPI, or None if no active session."""
+    auth_mgr = DualAuthManager()
+    tokens = auth_mgr.get_active_tokens()
+    if not tokens:
+        return None
+    headers = tokens.get("headers", {})
+    if not headers:
+        if "access_token" in tokens:
+            headers["Authorization"] = f"Bearer {tokens['access_token']}"
+        elif "cookies" in tokens:
+            headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+    return GarminAPI(session_headers=headers)
+
+
+@mcp.tool()
+def change_activity_type(activity_id: int, type_key: str) -> Dict[str, Any]:
+    """Reclassify an activity's sport type (e.g. mislabeled hike -> 'hiking', 'running', 'surfing_v2')."""
+    api = _authed_api_for_mcp()
+    if not api:
+        return {"error": "unauthenticated"}
+    try:
+        result = api.change_activity_type(activity_id, type_key)
+        return {"status": "success", "activity_id": activity_id, "result": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def preview_activity_outliers(activity_id: int) -> Dict[str, Any]:
+    """Detect outliers in an activity's raw FIT data (altitude/depth deviating
+    sharply from the activity's own median, GPS location-hop speed spikes)
+    WITHOUT modifying or uploading anything. Call this before
+    `apply_activity_corrections` to review what would change."""
+    api = _authed_api_for_mcp()
+    if not api:
+        return {"error": "unauthenticated"}
+    return activity_corrections.preview_corrections(api, activity_id)
+
+
+@mcp.tool()
+def apply_activity_corrections(activity_id: int, confirm: bool = False) -> Dict[str, Any]:
+    """Correct detected outliers and replace the activity on Garmin Connect.
+
+    Destructive: deletes the original activity and uploads a corrected
+    replacement (new activity ID; comments/kudos on the original are lost).
+    The original FIT file is always backed up locally first. Call
+    `preview_activity_outliers` first and only set confirm=True once the
+    findings have been reviewed and approved (by you or the user)."""
+    if not confirm:
+        return {
+            "status": "confirmation_required",
+            "message": "Call preview_activity_outliers first, then re-call this tool with confirm=True to apply.",
+        }
+    api = _authed_api_for_mcp()
+    if not api:
+        return {"error": "unauthenticated"}
+    return activity_corrections.apply_corrections(api, activity_id, confirm=True)
 
 
 @mcp.tool()

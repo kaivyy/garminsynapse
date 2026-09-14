@@ -1,5 +1,7 @@
 """Full Garmin Connect API Wrapper wrapping 180+ endpoints from python-garminconnect."""
+import io
 import logging
+import zipfile
 from typing import Dict, Any, List, Optional
 import functools
 import requests
@@ -290,9 +292,54 @@ class GarminAPI:
 
     @with_auto_retry
     def download_activity_fit(self, activity_id: int) -> bytes:
-        """Download raw binary FIT file for an activity."""
+        """Download raw binary FIT file for an activity.
+
+        Garmin Connect's ORIGINAL download format sometimes returns a ZIP
+        archive wrapping a single ``<id>_ACTIVITY.fit`` member (observed for
+        activities recorded via the Garmin Connect mobile app) instead of raw
+        FIT bytes. Transparently unwrap that case so callers always get raw
+        FIT bytes.
+        """
         if self._garmin_instance:
-            return self._garmin_instance.download_activity(activity_id, dl_fmt=self._garmin_instance.ActivityDownloadFormat.ORIGINAL)
-        url = f"{self.base_url}/download-service/files/activity/{activity_id}"
-        resp = self.session.get(url)
-        return resp.content if resp.status_code == 200 else b""
+            raw = self._garmin_instance.download_activity(activity_id, dl_fmt=self._garmin_instance.ActivityDownloadFormat.ORIGINAL)
+        else:
+            url = f"{self.base_url}/download-service/files/activity/{activity_id}"
+            resp = self.session.get(url)
+            raw = resp.content if resp.status_code == 200 else b""
+        return self._unwrap_fit_zip(raw)
+
+    @staticmethod
+    def _unwrap_fit_zip(raw: bytes) -> bytes:
+        if not raw or not zipfile.is_zipfile(io.BytesIO(raw)):
+            return raw
+        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            names = z.namelist()
+            fit_names = [n for n in names if n.lower().endswith(".fit")]
+            target = fit_names[0] if fit_names else (names[0] if names else None)
+            if target is None:
+                return raw
+            return z.read(target)
+
+    @with_auto_retry
+    def get_activity_types(self) -> List[Dict[str, Any]]:
+        """Fetch the catalog of valid Garmin Connect activity types."""
+        if self._garmin_instance:
+            return self._garmin_instance.get_activity_types()
+        return []
+
+    def resolve_activity_type(self, type_key: str) -> Dict[str, Any]:
+        """Look up the type_id/parent_type_id catalog entry for a given type_key (e.g. 'hiking')."""
+        for t in self.get_activity_types():
+            if t.get("typeKey") == type_key:
+                return t
+        raise ValueError(f"Unknown activity type_key: {type_key!r}")
+
+    @with_auto_retry
+    def change_activity_type(self, activity_id: int, type_key: str) -> Dict[str, Any]:
+        """Reclassify an existing activity to a different activity type."""
+        if not self._garmin_instance:
+            raise RuntimeError("Not authenticated with Garmin Connect.")
+        t = self.resolve_activity_type(type_key)
+        return self._garmin_instance.set_activity_type(
+            activity_id, t.get("typeId"), t.get("typeKey"), t.get("parentTypeId")
+        )

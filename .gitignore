@@ -54,3 +54,4 @@ graphify-out/
 ecosystem.config.cjs
 mcp_http_server.py
 mcp_stdio_server.py
+test_fixtures/

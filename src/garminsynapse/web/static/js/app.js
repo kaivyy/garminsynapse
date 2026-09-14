@@ -41,6 +41,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalActMaxHr = document.getElementById('modal-act-maxhr');
     const modalActCalories = document.getElementById('modal-act-calories');
 
+    const activityTypeSelect = document.getElementById('activity-type-select');
+    const applyTypeBtn = document.getElementById('apply-type-btn');
+    const typeChangeStatus = document.getElementById('type-change-status');
+    const previewCorrectionsBtn = document.getElementById('preview-corrections-btn');
+    const correctionsStatus = document.getElementById('corrections-status');
+    const correctionsFindingsEl = document.getElementById('corrections-findings');
+    const applyCorrectionsRow = document.getElementById('apply-corrections-row');
+    const applyCorrectionsBtn = document.getElementById('apply-corrections-btn');
+
+    let currentActivityId = null;
+    let activityTypesCache = null;
+
     let currentStartDate = '';
     let currentEndDate = '';
 
@@ -206,6 +218,128 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activityModal) {
         activityModal.addEventListener('click', (e) => {
             if (e.target === activityModal) activityModal.classList.add('hidden');
+        });
+    }
+
+    function resetCorrectionsPanel() {
+        correctionsStatus.textContent = '';
+        correctionsFindingsEl.innerHTML = '';
+        correctionsFindingsEl.classList.add('hidden');
+        applyCorrectionsRow.classList.add('hidden');
+        typeChangeStatus.textContent = '';
+    }
+
+    async function populateActivityTypeSelect(currentTypeKey) {
+        try {
+            if (!activityTypesCache) {
+                const res = await fetch('/api/v1/activity-types');
+                if (!res.ok) throw new Error('Failed to load activity types');
+                const data = await res.json();
+                activityTypesCache = data.types || [];
+            }
+            activityTypeSelect.innerHTML = '';
+            activityTypesCache.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.typeKey;
+                opt.textContent = t.typeKey;
+                if (t.typeKey === currentTypeKey) opt.selected = true;
+                activityTypeSelect.appendChild(opt);
+            });
+        } catch (err) {
+            console.error('Failed to load activity types:', err);
+            activityTypeSelect.innerHTML = '<option value="">(unavailable)</option>';
+        }
+    }
+
+    if (applyTypeBtn) {
+        applyTypeBtn.addEventListener('click', async () => {
+            if (!currentActivityId) return;
+            const typeKey = activityTypeSelect.value;
+            if (!typeKey) return;
+            typeChangeStatus.textContent = 'Saving…';
+            try {
+                const res = await fetch(`/api/v1/activity/${currentActivityId}/type`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type_key: typeKey })
+                });
+                if (res.ok) {
+                    typeChangeStatus.textContent = '✅ Type updated.';
+                    modalActType.textContent = typeKey;
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    typeChangeStatus.textContent = `❌ ${err.detail || 'Failed to update type.'}`;
+                }
+            } catch (err) {
+                typeChangeStatus.textContent = `❌ ${err.message}`;
+            }
+        });
+    }
+
+    let lastCorrectionsFindings = [];
+
+    function renderFindings(findings) {
+        correctionsFindingsEl.innerHTML = '';
+        if (!findings || findings.length === 0) {
+            correctionsFindingsEl.classList.add('hidden');
+            applyCorrectionsRow.classList.add('hidden');
+            correctionsStatus.textContent = '✅ No outliers detected.';
+            return;
+        }
+        findings.forEach(f => {
+            const li = document.createElement('li');
+            li.textContent = `[${f.detector}] index ${f.index} (${f.field}): ${f.reason}`;
+            correctionsFindingsEl.appendChild(li);
+        });
+        correctionsFindingsEl.classList.remove('hidden');
+        applyCorrectionsRow.classList.remove('hidden');
+        correctionsStatus.textContent = `⚠️ ${findings.length} outlier(s) found.`;
+    }
+
+    if (previewCorrectionsBtn) {
+        previewCorrectionsBtn.addEventListener('click', async () => {
+            if (!currentActivityId) return;
+            correctionsStatus.textContent = 'Scanning…';
+            correctionsFindingsEl.classList.add('hidden');
+            applyCorrectionsRow.classList.add('hidden');
+            try {
+                const res = await fetch(`/api/v1/activity/${currentActivityId}/corrections/preview`);
+                if (!res.ok) throw new Error('Preview request failed');
+                const data = await res.json();
+                lastCorrectionsFindings = data.findings || [];
+                renderFindings(lastCorrectionsFindings);
+            } catch (err) {
+                correctionsStatus.textContent = `❌ ${err.message}`;
+            }
+        });
+    }
+
+    if (applyCorrectionsBtn) {
+        applyCorrectionsBtn.addEventListener('click', async () => {
+            if (!currentActivityId || lastCorrectionsFindings.length === 0) return;
+            const confirmed = window.confirm(
+                'This will DELETE the original activity and upload a corrected replacement ' +
+                '(new activity ID; kudos/comments will be lost). The original FIT file is backed up ' +
+                'locally first. Continue?'
+            );
+            if (!confirmed) return;
+            correctionsStatus.textContent = 'Applying fix…';
+            try {
+                const res = await fetch(`/api/v1/activity/${currentActivityId}/corrections/apply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirm: true })
+                });
+                const data = await res.json();
+                if (res.ok && data.applied) {
+                    correctionsStatus.textContent = `✅ Corrected activity uploaded. Backup saved to ${data.backup_path}.`;
+                    applyCorrectionsRow.classList.add('hidden');
+                } else {
+                    correctionsStatus.textContent = `❌ ${data.detail || data.reason || 'Failed to apply corrections.'}`;
+                }
+            } catch (err) {
+                correctionsStatus.textContent = `❌ ${err.message}`;
+            }
         });
     }
 
@@ -535,6 +669,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function openActivityModal(act) {
         try {
+            currentActivityId = act.id;
             modalActName.textContent = act.name || 'Workout Details';
             modalActType.textContent = act.type || 'Activity';
             modalActTime.textContent = act.start_ts || '--';
@@ -544,6 +679,8 @@ document.addEventListener('DOMContentLoaded', () => {
             modalActMaxHr.textContent = act.max_hr ? `${act.max_hr} bpm` : '--';
             modalActCalories.textContent = act.calories ? `${act.calories} kcal` : '--';
             activityModal.classList.remove('hidden');
+            resetCorrectionsPanel();
+            populateActivityTypeSelect(act.type);
 
             const splitsContainer = document.getElementById('splits-container');
             const splitsTableBody = document.getElementById('splits-table-body');

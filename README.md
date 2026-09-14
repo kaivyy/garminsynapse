@@ -212,6 +212,9 @@ In **Editor Settings** -> **Model Context Protocol (MCP)** -> **Add New Command*
 | `get_activity_details` | `activity_id` | Get detailed time-series metrics & map polyline |
 | `download_fit_file` | `activity_id` | Download raw binary `.FIT` file to local storage |
 | `query_garmin_db` | `sql_query` | Execute safe `SELECT` query on SQLite DB (40+ tables) |
+| `change_activity_type` | `activity_id`, `type_key` | Reclassify an activity's type (e.g. `hiking`, `running`) |
+| `preview_activity_outliers` | `activity_id` | Detect altitude/depth & GPS "location hop" outliers without modifying anything |
+| `apply_activity_corrections` | `activity_id`, `confirm` (default `False`) | Correct detected outliers and re-upload the fixed activity. **Destructive** — deletes and replaces the original (new activity ID; kudos/comments lost). Refuses unless `confirm=True`. Original FIT is always backed up first. |
 
 ---
 
@@ -232,6 +235,67 @@ In **Editor Settings** -> **Model Context Protocol (MCP)** -> **Add New Command*
 | `GET` | `/api/v1/activities` | List recent logged workouts with date filters |
 | `GET` | `/api/v1/activity/{id}` | Single activity full details |
 | `POST` | `/api/v1/sync` | Trigger manual data extraction (with 5-minute cooldown) |
+| `GET` | `/api/v1/activity-types` | List the valid Garmin Connect activity-type catalog |
+| `PUT` | `/api/v1/activity/{id}/type` | Change an activity's type. Body: `{"type_key": "hiking"}` |
+| `GET` | `/api/v1/activity/{id}/corrections/preview` | Detect altitude/depth & GPS location-hop outliers without modifying anything |
+| `POST` | `/api/v1/activity/{id}/corrections/apply` | Correct outliers and re-upload the fixed activity. Body: `{"confirm": true}` (required). **Destructive** — see safety model below. |
+
+---
+
+## 🩹 Activity Type Editing & Outlier Correction
+
+Two related capabilities for cleaning up recorded activities, exposed identically via CLI, Web UI, and MCP tools:
+
+- **Change activity type** — reclassify a mislabeled activity (e.g. a hike
+  logged as "walking").
+- **Outlier detection & correction** — scans an activity's FIT records for:
+  - **Altitude/depth outliers**, detected relative to the activity's own
+    median (via a robust MAD-based z-score), *not* an absolute
+    "negative = bad" rule — this correctly handles lakes at altitude and
+    tide-influenced water sports where legitimate readings can look
+    "negative" relative to sea-level datum.
+  - **GPS "location hop" speed spikes** — a bad GPS fix that implies an
+    impossible instantaneous speed; corrected by interpolating from
+    neighboring valid fixes.
+  - The detector framework (`core/outlier_detectors.py`) is pluggable —
+    additional detectors (e.g. HR spikes) can be added without restructuring.
+
+### ⚠️ Safety model (why this is a two-step, confirm-gated flow)
+
+There is no Garmin Connect API to patch an individual metric inside an
+existing activity. The only way to fix bad data is:
+
+`download original FIT → correct outliers → re-encode → delete original → upload corrected FIT`
+
+This is **destructive**: the corrected activity gets a new activity ID, and
+any kudos/comments/PRs on the original are lost. To guard against accidental
+data loss:
+
+1. **Preview first** — `preview-corrections` / `.../corrections/preview` /
+   `preview_activity_outliers` always runs read-only; nothing is deleted or
+   uploaded.
+2. **Explicit confirmation required** — the apply step refuses to run unless
+   `confirm=True` (MCP), `{"confirm": true}` (Web API), or an interactive
+   `y/N` prompt (CLI `activity fix`) is explicitly satisfied. The Web UI adds
+   a client-side `confirm()` dialog on top of this.
+3. **Always backed up** — the original FIT file is saved to
+   `garmin_files/backups/<activity_id>_<timestamp>.fit` before the original
+   activity is deleted, so it can be re-diffed or manually restored later.
+
+### CLI
+
+```bash
+# Change an activity's type
+garminsynapse activity set-type <activity_id> <type_key>
+
+# Preview detected outliers without changing anything
+garminsynapse activity preview-corrections <activity_id>
+
+# Correct outliers and re-upload (prompts for confirmation unless --dry-run)
+garminsynapse activity fix <activity_id> [--dry-run]
+```
+
+
 
 ---
 

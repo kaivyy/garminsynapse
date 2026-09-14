@@ -82,5 +82,91 @@ def prune(days_keep):
     click.echo(f"✂️ Pruned {count} activity records older than {days_keep} days.")
 
 
+@cli.group()
+def activity():
+    """Manage individual activities: reclassify type, detect/fix outliers."""
+    pass
+
+
+@activity.command("set-type")
+@click.argument("activity_id", type=int)
+@click.argument("type_key")
+def activity_set_type(activity_id, type_key):
+    """Reclassify ACTIVITY_ID to activity type TYPE_KEY (e.g. 'hiking', 'running')."""
+    from garminsynapse.core.api import GarminAPI
+    api = GarminAPI()
+    try:
+        api.change_activity_type(activity_id, type_key)
+        click.echo(f"✅ Activity {activity_id} reclassified to '{type_key}'.")
+    except Exception as e:
+        click.echo(f"❌ Failed to change activity type: {e}", err=True)
+        raise SystemExit(1)
+
+
+def _print_findings(findings):
+    if not findings:
+        click.echo("✅ No outliers detected.")
+        return
+    click.echo(f"⚠️  Found {len(findings)} outlier(s):")
+    for f in findings:
+        click.echo(f"  - [{f['detector']}] index={f['index']} field={f['field']}: {f['reason']}")
+
+
+@activity.command("preview-corrections")
+@click.argument("activity_id", type=int)
+def activity_preview_corrections(activity_id):
+    """Preview detected outliers for ACTIVITY_ID without changing anything."""
+    from garminsynapse.core.api import GarminAPI
+    from garminsynapse.core import activity_corrections
+
+    api = GarminAPI()
+    result = activity_corrections.preview_corrections(api, activity_id)
+    click.echo(f"Activity {activity_id} ({result['sport']}, {result['record_count']} records):")
+    _print_findings(result["findings"])
+
+
+@activity.command("fix")
+@click.argument("activity_id", type=int)
+@click.option("--dry-run", is_flag=True, help="Preview only; never delete/re-upload.")
+def activity_fix(activity_id, dry_run):
+    """Detect and correct outliers in ACTIVITY_ID, then delete+re-upload the
+    corrected activity to Garmin Connect.
+
+    This is destructive: the corrected activity receives a NEW activity ID,
+    and any kudos/comments on the original are lost. A backup of the
+    original FIT file is always saved locally first. Requires interactive
+    confirmation unless --dry-run is passed.
+    """
+    from garminsynapse.core.api import GarminAPI
+    from garminsynapse.core import activity_corrections
+
+    api = GarminAPI()
+    preview = activity_corrections.preview_corrections(api, activity_id)
+    click.echo(f"Activity {activity_id} ({preview['sport']}, {preview['record_count']} records):")
+    _print_findings(preview["findings"])
+
+    if not preview["findings"]:
+        return
+    if dry_run:
+        click.echo("(dry run: no changes applied)")
+        return
+
+    click.echo(
+        "\n⚠️  Applying this fix will DELETE the original activity and upload a "
+        "corrected replacement (new activity ID; kudos/comments will be lost). "
+        "The original FIT file will be backed up locally first."
+    )
+    if not click.confirm("Proceed?", default=False):
+        click.echo("Aborted; no changes made.")
+        return
+
+    result = activity_corrections.apply_corrections(api, activity_id, confirm=True)
+    if not result["applied"]:
+        click.echo(f"No changes applied: {result.get('reason')}")
+        return
+    click.echo(f"✅ Corrected activity uploaded. Original backed up to {result['backup_path']}")
+    click.echo(result["encode_report"]["summary"])
+
+
 if __name__ == "__main__":
     cli()
