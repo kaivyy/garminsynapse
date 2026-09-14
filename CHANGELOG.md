@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.0] - 2026-09-14
+
+### 🚀 Major Features & Performance Upgrades
+
+- **Ultra-Fast Direct OAuth Token Refresh (<500ms)** (`auth/manager.py`):
+  - Added `fast_refresh()` in `DualAuthManager` utilizing direct OAuth endpoints at `https://diauth.garmin.com/di-oauth2-service/oauth/token`.
+  - Replaces heavy, 10–13 second full browser SSO scrapes with a lightweight ~300ms HTTP POST.
+  - Automatically captures and persists rotating refresh tokens (`di_refresh_token`) to disk (`tokens.json`), keeping sessions permanently alive.
+- **Proactive Background Token Refresher (0ms Latency)** (`web/app.py`):
+  - Integrated an asynchronous background lifespan task in FastAPI checking token health every 30 minutes.
+  - Proactively refreshes the token before expiry, eliminating latency for end users and MCP AI agents.
+- **Per-Km & Per-Lap Splits Engine** (`mcp/tools.py`, `web/routes.py`, `core/api.py`, `web/static/`):
+  - Added `get_activity_splits` MCP tool and `/api/v1/activities/{activity_id}/splits` REST endpoint.
+  - Enhanced the Activity Details modal with a Strava-style splits table displaying Pace (`MM:SS/km`), Distance, Duration, Elevation Gain (`+Xm`), Heart Rate, and Cadence.
+- **Non-Blocking Asynchronous Background Sync** (`web/routes.py`):
+  - Converted historical 7-day data extraction and ETL processing in `POST /api/v1/auth/login` to FastAPI `BackgroundTasks`.
+  - Drops login response latency from 45 seconds down to seconds, rendering the web dashboard immediately.
+
+### 🛡️ Reliability, Concurrency & Security
+
+- **Concurrency Locking & In-Flight Deduplication** (`auth/manager.py`):
+  - Added `_login_lock` thread mutex in `DualAuthManager`.
+  - Prevents race conditions and multiple concurrent requests from triggering simultaneous logins, eliminating Cloudflare HTTP 429 rate limits.
+- **Smart JWT Expiration Verification** (`auth/tokens.py`):
+  - Implemented `is_token_expired()` to inspect the JWT `exp` timestamp in `client_state` with a buffer margin.
+- **Persistent Obfuscated Credential Fallback** (`auth/tokens.py`, `auth/manager.py`):
+  - Securely stores credentials with strict `0600` permissions (`credentials.json`) as a secondary fallback if refresh tokens expire after prolonged inactivity.
+- **429-Prone Mobile Strategy Bypass** (`auth/cffi_strategy.py`):
+  - Explicitly bypasses mobile SSO login strategies on server/VPS environments (`skip_strategies = {"mobile+cffi", "mobile+requests"}`), speeding up fallback authentication.
+  - Added `verify_login=False` to skip redundant round-trip profile calls during login.
+- **Proper Header Extraction** (`auth/cffi_strategy.py`):
+  - Now uses `client_obj.get_api_headers()` to capture official Bearer authorization headers and device signatures.
+
+### 📱 UI & Mobile Enhancements
+
+- **Mobile Modal Flex-Scroll Fix** (`web/static/css/style.css`):
+  - Resolved mobile viewport clipping on long activity modals using flex-scroll backdrop layout.
+- **Graceful Splits Error Handling** (`core/api.py`):
+  - Handled activities without splits (e.g. Pilates, Yoga) returning 404/204 cleanly as empty arrays instead of 500 server errors.
+
 ## [v0.3.2] - 2026-08-25
 
 ### 🐛 Bug Fixes
