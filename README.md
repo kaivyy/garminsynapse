@@ -17,9 +17,55 @@
 
 *Bridge your Garmin training data, health metrics, and raw `.FIT` files directly to AI Agents (Claude, Cursor, AGY) and modern web clients.*
 
-[Features](#-key-features) • [Architecture](#-system-architecture) • [Quick Start](#-quick-start) • [MCP Guide](#-mcp-integration-guide) • [REST API](#-rest-api-endpoints) • [License](#-license)
+[Quick Start](#-quick-start) • [Features](#-key-features) • [Architecture](#-system-architecture) • [MCP Guide](#-mcp-integration-guide) • [REST API](#-rest-api-endpoints) • [License](#-license)
 
 </div>
+
+---
+
+## ⚡ Quick Start
+
+> [!TIP]
+> **Zero-Friction Install**: `install.sh` automatically checks & installs **all** prerequisites (Python ≥ 3.9, pip, git, system libs, Playwright browser, all 13 Python packages). Users never need to install anything manually.
+
+### Prerequisites (auto-handled by `install.sh`)
+
+| Requirement | Version | Notes |
+|---|---|---|
+| Python | ≥ 3.9 | Script checks and errors if missing |
+| pip | Any | Auto-installed via apt/dnf/pacman/brew |
+| git | Any | Auto-installed if missing |
+| System libs | libnss3, libgbm1, etc. | Auto-installed for Playwright on Debian/Ubuntu |
+
+### Installation
+
+```bash
+# 1. Clone Repository
+git clone https://github.com/kaivyy/garminsynapse.git
+cd garminsynapse
+
+# 2. One-Click Setup (checks & installs everything)
+chmod +x install.sh
+./install.sh
+
+# 3. Start Web Dashboard (Port 6060)
+garminsynapse start-server
+# or: python3 -m garminsynapse.cli start-server
+```
+
+Open your browser at `http://localhost:6060` or via Tailscale IP `http://<IP-Tailscale-Server>:6060`.
+
+### What `install.sh` does
+
+1. ✅ Checks Python ≥ 3.9, pip, git — auto-installs if missing
+2. ✅ Installs system libraries for Playwright (Debian/Ubuntu)
+3. ✅ Runs `pip install -e .[dev]` (all 13 dependencies from `pyproject.toml`)
+4. ✅ Installs Playwright Chromium browser binary
+5. ✅ Creates `garmin_files/` working directories and `~/.garminsynapse/` config
+6. ✅ **Validates installation** by importing all modules and testing the web server
+
+> [!NOTE]
+> No `requirements.txt` needed — all dependencies are declared in [`pyproject.toml`](pyproject.toml) using modern PEP 621 standards.
 
 ---
 
@@ -90,52 +136,6 @@ flowchart TD
     MCP --> AI
     SPA --> User
 ```
-
----
-
-## ⚡ Quick Start
-
-> [!TIP]
-> **Zero-Friction Install**: `install.sh` automatically checks & installs **all** prerequisites (Python ≥ 3.9, pip, git, system libs, Playwright browser, all 13 Python packages). Users never need to install anything manually.
-
-### Prerequisites (auto-handled by `install.sh`)
-
-| Requirement | Version | Notes |
-|---|---|---|
-| Python | ≥ 3.9 | Script checks and errors if missing |
-| pip | Any | Auto-installed via apt/dnf/pacman/brew |
-| git | Any | Auto-installed if missing |
-| System libs | libnss3, libgbm1, etc. | Auto-installed for Playwright on Debian/Ubuntu |
-
-### Installation
-
-```bash
-# 1. Clone Repository
-git clone https://github.com/kaivyy/garminsynapse.git
-cd garminsynapse
-
-# 2. One-Click Setup (checks & installs everything)
-chmod +x install.sh
-./install.sh
-
-# 3. Start Web Dashboard (Port 6060)
-garminsynapse start-server
-# or: python3 -m garminsynapse.cli start-server
-```
-
-Open your browser at `http://localhost:6060` or via Tailscale IP `http://<IP-Tailscale-Server>:6060`.
-
-### What `install.sh` does
-
-1. ✅ Checks Python ≥ 3.9, pip, git — auto-installs if missing
-2. ✅ Installs system libraries for Playwright (Debian/Ubuntu)
-3. ✅ Runs `pip install -e .[dev]` (all 13 dependencies from `pyproject.toml`)
-4. ✅ Installs Playwright Chromium browser binary
-5. ✅ Creates `garmin_files/` working directories and `~/.garminsynapse/` config
-6. ✅ **Validates installation** by importing all modules and testing the web server
-
-> [!NOTE]
-> No `requirements.txt` needed — all dependencies are declared in [`pyproject.toml`](pyproject.toml) using modern PEP 621 standards.
 
 ---
 
