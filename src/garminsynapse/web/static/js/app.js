@@ -120,14 +120,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!devData) return;
 
         let dev = null;
-        if (devData.devices && devData.devices.length > 0) {
-            dev = devData.devices[0];
-        } else if (devData.primary && devData.primary.RegisteredDevices && devData.primary.RegisteredDevices.length > 0) {
+        const devicesList = devData.devices || [];
+        const primaryDeviceId = devData.primary && devData.primary.PrimaryTrainingDevice
+            ? devData.primary.PrimaryTrainingDevice.deviceId
+            : null;
+
+        if (primaryDeviceId != null && devicesList.length > 0) {
+            dev = devicesList.find(d => String(d.unitId) === String(primaryDeviceId)) || null;
+        }
+        if (!dev && devicesList.length > 0) {
+            dev = devicesList.find(d => d.primaryTrainingCapable || d.primaryActivityTrackerIndicator || d.isPrimaryUser) || devicesList[0];
+        }
+        if (!dev && devData.primary && devData.primary.RegisteredDevices && devData.primary.RegisteredDevices.length > 0) {
             dev = devData.primary.RegisteredDevices[0];
         }
 
         if (dev) {
             const devName = dev.productDisplayName || dev.displayName || dev.deviceCategory || 'Garmin Watch';
+            if (modelElem) modelElem.textContent = devName;
             function maskIdentifier(val, prefixLen = 4) {
                 if (!val || val === 'N/A') return 'N/A';
                 const str = String(val);
