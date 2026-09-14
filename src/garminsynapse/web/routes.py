@@ -257,48 +257,94 @@ def summary(
     try:
         start_d = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
         end_d = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
+        is_range = bool((start_d and end_d and start_d != end_d) or (not start_d and not end_d))
 
         daily_q = session.query(DailySummary)
         if start_d and end_d:
             daily_q = daily_q.filter(DailySummary.calendar_date.between(start_d, end_d))
-        daily_rec = daily_q.order_by(DailySummary.calendar_date.desc()).first()
-        if daily_rec:
-            if daily_rec.steps is not None: steps = daily_rec.steps
-            if daily_rec.resting_hr is not None: resting_hr = daily_rec.resting_hr
-            if daily_rec.avg_respiration is not None: respiration_rate = daily_rec.avg_respiration
-            if daily_rec.avg_spo2 is not None: spo2 = daily_rec.avg_spo2
+        all_daily = daily_q.order_by(DailySummary.calendar_date.desc()).all()
+        daily_rec = all_daily[0] if all_daily else None
 
         sleep_q = session.query(Sleep)
         if start_d and end_d:
             sleep_q = sleep_q.filter(Sleep.calendar_date.between(start_d, end_d))
-        sleep_rec = sleep_q.order_by(Sleep.sleep_id.desc()).first()
-        if sleep_rec and sleep_rec.sleep_score:
-            sleep_score = sleep_rec.sleep_score
-            
+        all_sleep = sleep_q.order_by(Sleep.calendar_date.desc()).all()
+        sleep_rec = all_sleep[0] if all_sleep else None
+
         hrv_q = session.query(HRV)
         if start_d and end_d:
             hrv_q = hrv_q.filter(HRV.calendar_date.between(start_d, end_d))
-        hrv_rec = hrv_q.order_by(HRV.calendar_date.desc()).first()
-        if hrv_rec:
-            hrv_status = hrv_rec.weekly_avg
-            
+        all_hrv = hrv_q.order_by(HRV.calendar_date.desc()).all()
+        hrv_rec = all_hrv[0] if all_hrv else None
+
         stress_q = session.query(Stress)
         if start_d and end_d:
             stress_q = stress_q.filter(Stress.calendar_date.between(start_d, end_d))
-        stress_rec = stress_q.order_by(Stress.calendar_date.desc()).first()
-        if stress_rec:
-            stress_level = stress_rec.avg_stress_level
-            
+        all_stress = stress_q.order_by(Stress.calendar_date.desc()).all()
+        stress_rec = all_stress[0] if all_stress else None
+
         battery_q = session.query(BodyBattery)
         if start_d and end_d:
             battery_q = battery_q.filter(BodyBattery.calendar_date.between(start_d, end_d))
-        battery_rec = battery_q.order_by(BodyBattery.calendar_date.desc()).first()
-        if battery_rec:
-            body_battery = battery_rec.charged
+        all_battery = battery_q.order_by(BodyBattery.calendar_date.desc()).all()
+        battery_rec = all_battery[0] if all_battery else None
 
         prof = session.query(UserProfile).filter_by(latest=True).first()
         if prof:
             vo2_max = prof.vo2_max_running or prof.vo2_max_cycling
+
+        if is_range and all_daily:
+            steps_list = [r.steps for r in all_daily if r.steps is not None]
+            total_steps = sum(steps_list)
+            avg_steps = round(total_steps / len(steps_list)) if steps_list else 0
+            steps = total_steps
+            
+            dists = [r.total_distance_meters for r in all_daily if r.total_distance_meters is not None]
+            total_distance_km = round(sum(dists) / 1000.0, 2)
+            
+            cals = [r.total_calories for r in all_daily if r.total_calories is not None]
+            total_calories = sum(cals)
+            
+            rhrs = [r.resting_hr for r in all_daily if r.resting_hr is not None]
+            resting_hr = round(sum(rhrs) / len(rhrs)) if rhrs else None
+            
+            resps = [r.avg_respiration for r in all_daily if r.avg_respiration is not None]
+            respiration_rate = round(sum(resps) / len(resps), 1) if resps else None
+            
+            spo2s = [r.avg_spo2 for r in all_daily if r.avg_spo2 is not None]
+            spo2 = round(sum(spo2s) / len(spo2s), 1) if spo2s else None
+            
+            sleep_scores = [r.sleep_score for r in all_sleep if r.sleep_score is not None]
+            sleep_score = round(sum(sleep_scores) / len(sleep_scores)) if sleep_scores else None
+            
+            stress_vals = [r.avg_stress_level for r in all_stress if r.avg_stress_level is not None]
+            stress_level = round(sum(stress_vals) / len(stress_vals)) if stress_vals else None
+            
+            bat_vals = [r.charged for r in all_battery if r.charged is not None]
+            body_battery = round(sum(bat_vals) / len(bat_vals)) if bat_vals else None
+            
+            hrv_vals = [r.weekly_avg or r.last_night_avg for r in all_hrv if (r.weekly_avg or r.last_night_avg) is not None]
+            hrv_status = round(sum(hrv_vals) / len(hrv_vals)) if hrv_vals else None
+            days_count = len(all_daily)
+        else:
+            if daily_rec:
+                if daily_rec.steps is not None: steps = daily_rec.steps
+                if daily_rec.resting_hr is not None: resting_hr = daily_rec.resting_hr
+                if daily_rec.avg_respiration is not None: respiration_rate = daily_rec.avg_respiration
+                if daily_rec.avg_spo2 is not None: spo2 = daily_rec.avg_spo2
+            if sleep_rec and sleep_rec.sleep_score:
+                sleep_score = sleep_rec.sleep_score
+            if hrv_rec:
+                hrv_status = hrv_rec.weekly_avg
+            if stress_rec:
+                stress_level = stress_rec.avg_stress_level
+            if battery_rec:
+                body_battery = battery_rec.charged
+            total_steps = steps
+            avg_steps = steps
+            total_distance_km = round((daily_rec.total_distance_meters or 0) / 1000.0, 2) if daily_rec else 0.0
+            total_calories = daily_rec.total_calories if daily_rec and daily_rec.total_calories else 0
+            days_count = 1
 
     except Exception as e:
         logger.debug(f"Error querying summary metrics: {e}")
@@ -308,7 +354,13 @@ def summary(
     return JSONResponse({
         "start_date": start_date,
         "end_date": end_date,
+        "is_range": is_range,
+        "days_count": days_count,
         "steps": steps,
+        "total_steps": total_steps,
+        "avg_steps": avg_steps,
+        "total_distance_km": total_distance_km,
+        "total_calories": total_calories,
         "resting_hr": resting_hr,
         "sleep_score": sleep_score,
         "body_battery": body_battery,
@@ -384,7 +436,7 @@ def user_profile():
 def activities(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-    limit: int = Query(20, ge=1, le=100)
+    limit: int = Query(100, ge=1, le=500)
 ):
     """List activities from SQLite database with optional custom date range filtering."""
     auth_mgr = DualAuthManager()
@@ -412,7 +464,9 @@ def activities(
                 "type": r.activity_type_key,
                 "start_ts": str(r.start_ts),
                 "duration": f"{int((r.duration or 0) / 60)} min",
+                "duration_sec": r.duration,
                 "distance": f"{(r.distance or 0) / 1000:.2f}",
+                "distance_m": r.distance,
                 "avg_hr": r.average_hr,
                 "max_hr": r.max_hr,
                 "calories": r.calories

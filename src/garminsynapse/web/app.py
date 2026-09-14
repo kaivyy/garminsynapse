@@ -2,8 +2,9 @@ import os
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from .routes import router
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,19 @@ async def lifespan(app: FastAPI):
     refresh_task.cancel()
 
 
+class NoCacheStaticMiddleware(BaseHTTPMiddleware):
+    """Ensure static files (.css, .js, .html) are never stale in browser."""
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        if request.url.path.startswith(("/css", "/js", "/static")) or request.url.path == "/" or request.url.path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+
 app = FastAPI(title="Garmin Synapse", lifespan=lifespan)
+app.add_middleware(NoCacheStaticMiddleware)
 
 app.include_router(router, prefix="/api/v1")
 

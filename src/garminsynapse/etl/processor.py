@@ -20,6 +20,29 @@ class GarminProcessor:
     def __init__(self, db_manager: Optional[DatabaseManager] = None):
         self.db_manager = db_manager or DatabaseManager()
 
+    def _extract_user_id(self, session, data: dict) -> int:
+        """Extract user_id from various Garmin JSON schemas with fallback to existing User."""
+        uid = (
+            data.get("userProfilePK")
+            or data.get("userProfilePk")
+            or data.get("userProfileId")
+            or data.get("userId")
+            or data.get("id")
+        )
+        if uid:
+            return int(uid)
+        
+        from garminsynapse.db.schema import UserProfile, User
+        prof = session.query(UserProfile).first()
+        if prof and prof.user_id:
+            return int(prof.user_id)
+            
+        u = session.query(User).filter(User.user_id != 0).first()
+        if u:
+            return int(u.user_id)
+            
+        return 0
+
     def _ensure_user_exists(self, session, user_id: int):
         """Ensure User record exists for FK constraints."""
         if not user_id:
@@ -66,7 +89,7 @@ class GarminProcessor:
 
         session = self.db_manager.get_session()
         try:
-            user_id = data.get("id") or data.get("userId", 0)
+            user_id = self._extract_user_id(session, data)
             self._ensure_user_exists(session, user_id)
             user_data = data.get("userData", {})
 
@@ -115,7 +138,7 @@ class GarminProcessor:
 
             if "dailySleepDTO" in data:
                 sleep_dto = data["dailySleepDTO"]
-                user_id = sleep_dto.get("userProfilePK") or sleep_dto.get("userId", 0)
+                user_id = self._extract_user_id(session, sleep_dto)
                 self._ensure_user_exists(session, user_id)
 
                 cal_str = cal_date_str or sleep_dto.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
@@ -148,7 +171,7 @@ class GarminProcessor:
                 logger.info(f"Processed sleep JSON record for {parsed_date}")
 
             elif "_STATS" in json_path.name and isinstance(data, dict):
-                user_id = data.get("userProfilePK") or data.get("userId", 0)
+                user_id = self._extract_user_id(session, data)
                 self._ensure_user_exists(session, user_id)
                 cal_str = cal_date_str or data.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
@@ -186,7 +209,7 @@ class GarminProcessor:
                 logger.info(f"Processed DailySummary record for {parsed_date}")
 
             elif "_RESPIRATION" in json_path.name and isinstance(data, dict):
-                user_id = data.get("userProfilePK") or data.get("userId", 0)
+                user_id = self._extract_user_id(session, data)
                 self._ensure_user_exists(session, user_id)
                 cal_str = cal_date_str or data.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
@@ -201,7 +224,7 @@ class GarminProcessor:
                     session.commit()
 
             elif "_SPO2" in json_path.name and isinstance(data, dict):
-                user_id = data.get("userProfilePK") or data.get("userId", 0)
+                user_id = self._extract_user_id(session, data)
                 self._ensure_user_exists(session, user_id)
                 cal_str = cal_date_str or data.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
@@ -216,7 +239,7 @@ class GarminProcessor:
                     session.commit()
 
             elif "_STRESS" in json_path.name and isinstance(data, dict):
-                user_id = data.get("userProfilePK") or data.get("userId", 0)
+                user_id = self._extract_user_id(session, data)
                 self._ensure_user_exists(session, user_id)
                 cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
@@ -231,7 +254,7 @@ class GarminProcessor:
                 session.commit()
 
             elif "_HRV" in json_path.name and isinstance(data, dict):
-                user_id = data.get("userProfilePK") or data.get("userId", 0)
+                user_id = self._extract_user_id(session, data)
                 self._ensure_user_exists(session, user_id)
                 cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
@@ -250,7 +273,7 @@ class GarminProcessor:
                 session.commit()
 
             elif "_HEART_RATE" in json_path.name and isinstance(data, dict):
-                user_id = data.get("userProfilePK") or data.get("userId", 0)
+                user_id = self._extract_user_id(session, data)
                 self._ensure_user_exists(session, user_id)
                 cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()

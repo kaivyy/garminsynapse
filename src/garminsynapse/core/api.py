@@ -169,6 +169,98 @@ class GarminAPI:
         resp = self.session.get(url)
         return resp.json() if resp.status_code == 200 else {}
 
+    def _normalize_to_1km_splits(self, laps: list, target_dist: float = 1000.0) -> list:
+        """Normalize raw lap segments into continuous 1.0 km metric splits.
+        
+        Fixes issue where workout phases, interval steps, or manual lap buttons
+        fragment splits into non-1km segments (e.g. 1km, 1km, 1km, 0.75km, 1km, 0.3km).
+        """
+        if not laps or not isinstance(laps, list):
+            return []
+            
+        needs_norm = False
+        for lap in laps[:-1]:
+            d = lap.get("distance", 0) or 0
+            if abs(d - target_dist) > 50:  # >50m deviation
+                needs_norm = True
+                break
+                
+        if not needs_norm:
+            for idx, lap in enumerate(laps):
+                if not lap.get("splitIndex"):
+                    lap["splitIndex"] = idx + 1
+            return laps
+
+        lap_iter = iter(laps)
+        lap = next(lap_iter, None)
+        lap_rem_dist = float(lap.get("distance") or 0) if lap else 0.0
+        lap_rem_dur = float(lap.get("duration") or 0) if lap else 0.0
+        lap_rem_elev = float(lap.get("elevationGain") or 0) if lap else 0.0
+        lap_hr = lap.get("averageHR")
+        lap_max_hr = lap.get("maxHR")
+        lap_cadence = lap.get("averageRunCadence")
+
+        splits = []
+        split_idx = 1
+        while lap is not None:
+            accum_dist = 0.0
+            accum_dur = 0.0
+            accum_elev = 0.0
+            hr_weight = 0.0
+            cad_weight = 0.0
+            max_hr_val = 0.0
+            
+            while accum_dist < target_dist and lap is not None:
+                needed = target_dist - accum_dist
+                take_dist = min(needed, lap_rem_dist)
+                fraction = take_dist / lap_rem_dist if lap_rem_dist > 0 else 0.0
+                
+                take_dur = lap_rem_dur * fraction
+                take_elev = (lap_rem_elev or 0) * fraction
+                
+                accum_dist += take_dist
+                accum_dur += take_dur
+                accum_elev += take_elev
+                if lap_hr is not None:
+                    hr_weight += float(lap_hr) * take_dur
+                if lap_max_hr is not None:
+                    max_hr_val = max(max_hr_val, float(lap_max_hr))
+                if lap_cadence is not None:
+                    cad_weight += float(lap_cadence) * take_dur
+                
+                lap_rem_dist -= take_dist
+                lap_rem_dur -= take_dur
+                lap_rem_elev -= take_elev
+                
+                if lap_rem_dist <= 0.01:
+                    lap = next(lap_iter, None)
+                    if lap:
+                        lap_rem_dist = float(lap.get("distance") or 0)
+                        lap_rem_dur = float(lap.get("duration") or 0)
+                        lap_rem_elev = float(lap.get("elevationGain") or 0)
+                        lap_hr = lap.get("averageHR")
+                        lap_max_hr = lap.get("maxHR")
+                        lap_cadence = lap.get("averageRunCadence")
+            
+            if accum_dist > 0:
+                avg_spd = accum_dist / accum_dur if accum_dur > 0 else 0.0
+                avg_hr = hr_weight / accum_dur if accum_dur > 0 and hr_weight > 0 else None
+                avg_cad = cad_weight / accum_dur if accum_dur > 0 and cad_weight > 0 else None
+                
+                splits.append({
+                    "splitIndex": split_idx,
+                    "distance": round(accum_dist, 2),
+                    "duration": round(accum_dur, 2),
+                    "averageSpeed": avg_spd,
+                    "averageHR": round(avg_hr) if avg_hr else None,
+                    "maxHR": round(max_hr_val) if max_hr_val > 0 else None,
+                    "averageRunCadence": round(avg_cad) if avg_cad else None,
+                    "elevationGain": round(accum_elev, 1),
+                })
+                split_idx += 1
+                
+        return splits
+
     @with_auto_retry
     def get_activity_splits(self, activity_id: int) -> Dict[str, Any]:
         """Fetch per-km / per-lap splits for an activity."""
@@ -177,8 +269,8 @@ class GarminAPI:
                 data = self._garmin_instance.get_activity_splits(activity_id)
                 # garminconnect returns {"activityId": ..., "lapDTOs": [...]}
                 if isinstance(data, dict) and "lapDTOs" in data:
-                    return {"splits": data["lapDTOs"]}
-                return {"splits": data} if isinstance(data, list) else {"splits": []}
+                    return {"splits": self._normalize_to_1km_splits(data["lapDTOs"])}
+                return {"splits": self._normalize_to_1km_splits(data)} if isinstance(data, list) else {"splits": []}
             except Exception as e:
                 # Handle activities without split data.
                 if "404" in str(e) or "204" in str(e):
@@ -189,7 +281,9 @@ class GarminAPI:
         try:
             resp = self.session.get(url)
             if resp.status_code == 200 and resp.text:
-                return {"splits": resp.json().get("lapDTOs", resp.json()) if isinstance(resp.json(), dict) else resp.json()}
+                res_data = resp.json()
+                raw_laps = res_data.get("lapDTOs", res_data) if isinstance(res_data, dict) else res_data
+                return {"splits": self._normalize_to_1km_splits(raw_laps) if isinstance(raw_laps, list) else []}
         except Exception:
             pass
         return {"splits": []}

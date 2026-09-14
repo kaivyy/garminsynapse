@@ -105,51 +105,68 @@ document.addEventListener('DOMContentLoaded', () => {
         loadDeviceInfo();
     }
 
-    async function loadDeviceInfo() {
+    function renderDeviceCard(devData) {
         const modelElem = document.getElementById('device-model-name');
-        const infoElem = document.getElementById('device-extra-info');
+        const primaryTagElem = document.getElementById('device-primary-tag');
+        const snElem = document.getElementById('device-sn-val');
+        const unitIdElem = document.getElementById('device-unitid-val');
+        const fwElem = document.getElementById('device-fw-val');
+        const skuElem = document.getElementById('device-sku-badge');
+        const sensorElem = document.getElementById('device-sensor-val');
         const badgeElem = document.getElementById('device-status-badge');
+        const statusTextElem = document.getElementById('device-status-text');
+        const statusSubtextElem = document.getElementById('device-status-subtext');
+
+        if (!devData) return;
+
+        let dev = null;
+        if (devData.devices && devData.devices.length > 0) {
+            dev = devData.devices[0];
+        } else if (devData.primary && devData.primary.RegisteredDevices && devData.primary.RegisteredDevices.length > 0) {
+            dev = devData.primary.RegisteredDevices[0];
+        }
+
+        if (dev) {
+            const devName = dev.productDisplayName || dev.displayName || dev.deviceCategory || 'Garmin Watch';
+            if (modelElem) modelElem.textContent = devName;
+            if (snElem) snElem.textContent = dev.serialNumber || 'N/A';
+            if (unitIdElem) unitIdElem.textContent = dev.unitId ? String(dev.unitId) : 'N/A';
+            if (fwElem) fwElem.textContent = dev.currentFirmwareVersion ? `v${dev.currentFirmwareVersion}` : 'N/A';
+            if (skuElem && dev.actualProductSku) skuElem.textContent = `SKU ${dev.actualProductSku}`;
+            if (sensorElem) sensorElem.textContent = 'Elevate™ Gen 4';
+
+            const isPrimary = Boolean(dev.primaryActivityTrackerIndicator || dev.isPrimaryUser || dev.primaryTrainingCapable);
+            if (primaryTagElem) {
+                primaryTagElem.style.display = isPrimary ? 'inline-flex' : 'none';
+            }
+
+            if (badgeElem) {
+                badgeElem.className = 'link-status-badge link-status-badge--connected';
+            }
+            if (statusTextElem) statusTextElem.textContent = 'Connected';
+            if (statusSubtextElem) statusSubtextElem.textContent = 'Garmin Connect Active';
+        } else {
+            if (modelElem) modelElem.textContent = 'No Garmin Device Found';
+            if (snElem) snElem.textContent = '--';
+            if (unitIdElem) unitIdElem.textContent = '--';
+            if (fwElem) fwElem.textContent = '--';
+            if (skuElem) skuElem.textContent = 'SKU --';
+            if (sensorElem) sensorElem.textContent = '--';
+            if (primaryTagElem) primaryTagElem.style.display = 'none';
+            if (badgeElem) {
+                badgeElem.className = 'link-status-badge link-status-badge--disconnected';
+            }
+            if (statusTextElem) statusTextElem.textContent = 'Not Paired';
+            if (statusSubtextElem) statusSubtextElem.textContent = 'No tracker detected';
+        }
+    }
+
+    async function loadDeviceInfo() {
         try {
             const devRes = await fetch('/api/v1/devices');
             if (devRes.ok) {
                 const devData = await devRes.json();
-                if (devData.devices && devData.devices.length > 0) {
-                    const dev = devData.devices[0];
-                    const devName = dev.productDisplayName || dev.displayName || dev.deviceCategory || 'Garmin Watch';
-                    const serial = dev.serialNumber ? `SN: ${dev.serialNumber}` : '';
-                    const unitId = dev.unitId ? `Unit ID: ${dev.unitId}` : '';
-                    const fw = dev.currentFirmwareVersion ? `Firmware v${dev.currentFirmwareVersion}` : '';
-                    const infoText = [serial, unitId, fw].filter(Boolean).join(' • ');
-                    
-                    if (modelElem) modelElem.textContent = devName;
-                    if (infoElem) infoElem.textContent = infoText || 'Device Connected';
-                    if (badgeElem) {
-                        badgeElem.textContent = '● Connected';
-                        badgeElem.style.background = 'rgba(16, 185, 129, 0.15)';
-                        badgeElem.style.color = '#10b981';
-                    }
-                } else if (devData.primary && devData.primary.RegisteredDevices && devData.primary.RegisteredDevices.length > 0) {
-                    const reg = devData.primary.RegisteredDevices[0];
-                    const devName = reg.displayName || 'Garmin Watch';
-                    const serial = reg.serialNumber ? `SN: ${reg.serialNumber}` : '';
-                    const fw = reg.currentFirmwareVersion ? `Firmware v${reg.currentFirmwareVersion}` : '';
-                    const infoText = [serial, fw].filter(Boolean).join(' • ');
-                    if (modelElem) modelElem.textContent = devName;
-                    if (infoElem) infoElem.textContent = infoText || 'Device Connected';
-                    if (badgeElem) {
-                        badgeElem.textContent = '● Connected';
-                        badgeElem.style.background = 'rgba(16, 185, 129, 0.15)';
-                        badgeElem.style.color = '#10b981';
-                    }
-                } else {
-                    if (modelElem) modelElem.textContent = 'No Garmin Device Found';
-                    if (infoElem) infoElem.textContent = 'No registered watch or tracker detected on this Garmin account.';
-                    if (badgeElem) {
-                        badgeElem.textContent = '○ Not Paired';
-                        badgeElem.style.background = 'rgba(239, 68, 68, 0.15)';
-                        badgeElem.style.color = '#ef4444';
-                    }
-                }
+                renderDeviceCard(devData);
             }
         } catch (devErr) {
             console.warn('Could not load device info:', devErr);
@@ -264,53 +281,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 actUrl += `?${params.toString()}`;
             }
 
-            try {
-                const devRes = await fetch('/api/v1/devices');
-                if (devRes.ok) {
-                    const devData = await devRes.json();
-                    const modelElem = document.getElementById('device-model-name');
-                    const infoElem = document.getElementById('device-extra-info');
-                    const badgeElem = document.getElementById('device-status-badge');
-                    
-                    if (devData.devices && devData.devices.length > 0) {
-                        const dev = devData.devices[0];
-                        const devName = dev.productDisplayName || dev.displayName || dev.deviceCategory || 'Garmin Watch';
-                        const serial = dev.serialNumber ? `SN: ${dev.serialNumber}` : '';
-                        const unitId = dev.unitId ? `Unit ID: ${dev.unitId}` : '';
-                        const fw = dev.currentFirmwareVersion ? `Firmware v${dev.currentFirmwareVersion}` : '';
-                        const infoText = [serial, unitId, fw].filter(Boolean).join(' • ');
-                        
-                        if (modelElem) modelElem.textContent = devName;
-                        if (infoElem) infoElem.textContent = infoText || 'Device Connected';
-                        if (badgeElem) {
-                            badgeElem.textContent = '● Connected';
-                            badgeElem.style.background = 'rgba(16, 185, 129, 0.15)';
-                            badgeElem.style.color = '#10b981';
-                        }
-                    } else {
-                        if (modelElem) modelElem.textContent = 'No Garmin Device Found';
-                        if (infoElem) infoElem.textContent = 'No registered watch or tracker detected on this Garmin account.';
-                        if (badgeElem) {
-                            badgeElem.textContent = '○ Not Paired';
-                            badgeElem.style.background = 'rgba(239, 68, 68, 0.15)';
-                            badgeElem.style.color = '#ef4444';
-                        }
-                    }
-                }
-            } catch (devErr) {
-                console.warn('Could not load device info:', devErr);
-            }
+            await loadDeviceInfo();
 
             const summaryRes = await fetch(summaryUrl);
             if (summaryRes.ok) {
                 const summary = await summaryRes.json();
-                
+                const isRange = summary.is_range || false;
+
+                const stepsTitle = document.getElementById('steps-card-title');
+                const stepsSubtext = document.getElementById('steps-subtext');
+                const hrSubtext = document.getElementById('hr-subtext');
+                const sleepSubtext = document.getElementById('sleep-subtext');
+                const stressSubtext = document.getElementById('stress-subtext');
+                const batterySubtext = document.getElementById('battery-subtext');
+
                 const stepsNum = summary.steps || 0;
                 stepsVal.textContent = stepsNum.toLocaleString();
-                const pct = Math.min(100, Math.round((stepsNum / 10000) * 100));
-                stepsBar.style.width = `${pct}%`;
 
-                hrVal.innerHTML = summary.resting_hr ? `${summary.resting_hr} <span class="unit">bpm</span>` : `-- <span class="unit">bpm</span>`;
+                if (isRange) {
+                    if (stepsTitle) stepsTitle.textContent = 'Total Steps';
+                    if (stepsSubtext) {
+                        const avg = summary.avg_steps ? summary.avg_steps.toLocaleString() : 0;
+                        const dist = summary.total_distance_km ? `${summary.total_distance_km} km` : '';
+                        stepsSubtext.textContent = `Avg ${avg} / day (${summary.days_count || 0} days)${dist ? ' • ' + dist : ''}`;
+                    }
+                    stepsBar.style.width = '100%';
+                    if (hrSubtext) hrSubtext.textContent = `Avg Resting Heart Rate (${summary.days_count || 0} days)`;
+                    if (sleepSubtext) sleepSubtext.textContent = `Avg Sleep Score (${summary.days_count || 0} days)`;
+                    if (stressSubtext) stressSubtext.textContent = `Avg Stress (${summary.days_count || 0} days)`;
+                    if (batterySubtext) batterySubtext.textContent = 'Avg Energy Reserve';
+                } else {
+                    if (stepsTitle) stepsTitle.textContent = 'Daily Steps';
+                    if (stepsSubtext) stepsSubtext.textContent = 'Goal: 10,000 steps';
+                    const pct = Math.min(100, Math.round((stepsNum / 10000) * 100));
+                    stepsBar.style.width = `${pct}%`;
+                    if (hrSubtext) hrSubtext.textContent = 'Resting Heart Rate';
+                    if (sleepSubtext) sleepSubtext.textContent = 'Restorative Sleep';
+                    if (stressSubtext) stressSubtext.textContent = 'Daily Stress Average';
+                    if (batterySubtext) batterySubtext.textContent = 'Energy Reserve Level';
+                }
+
+                let finalHR = summary.resting_hr;
+                hrVal.innerHTML = finalHR ? `${finalHR} <span class="unit">bpm</span>` : `-- <span class="unit">bpm</span>`;
 
                 sleepScore.innerHTML = summary.sleep_score ? `${summary.sleep_score} <span class="unit">/ 100</span>` : `-- <span class="unit">/ 100</span>`;
 
@@ -325,6 +337,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (liveRes.ok) {
                             const liveData = await liveRes.json();
                             if (liveData.status === 'success') {
+                                if (liveData.heart_rate !== null && liveData.heart_rate !== undefined && !finalHR) {
+                                    finalHR = liveData.heart_rate;
+                                    hrVal.innerHTML = `${finalHR} <span class="unit">bpm</span>`;
+                                }
                                 if (liveData.body_battery !== null && !finalBB) {
                                     finalBB = liveData.body_battery;
                                 }
@@ -385,11 +401,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const actRes = await fetch(actUrl);
             if (actRes.ok) {
                 const activities = await actRes.json();
-                activityCount.textContent = `${activities.length} workouts`;
+                
+                let totalDistKm = 0;
+                let totalDurSec = 0;
+                let totalCals = 0;
+                activities.forEach(act => {
+                    totalDistKm += parseFloat(act.distance) || 0;
+                    totalDurSec += (act.duration_sec || 0);
+                    totalCals += (act.calories || 0);
+                });
+
+                if (activities.length > 0) {
+                    const durH = Math.floor(totalDurSec / 3600);
+                    const durM = Math.floor((totalDurSec % 3600) / 60);
+                    const durStr = durH > 0 ? `${durH}h ${durM}m` : `${durM}m`;
+                    const distStr = totalDistKm > 0 ? ` • ${totalDistKm.toFixed(1)} km` : '';
+                    const calsStr = totalCals > 0 ? ` • ${Math.round(totalCals).toLocaleString()} kcal` : '';
+                    activityCount.textContent = `${activities.length} workouts${distStr} • ${durStr}${calsStr}`;
+                } else {
+                    activityCount.textContent = '0 workouts';
+                }
+
                 activityTableBody.innerHTML = '';
 
                 if (activities.length === 0) {
-                    activityTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:40px; font-size:14px;">No device connected — No workouts logged for the selected range.</td></tr>`;
+                    activityTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:40px; font-size:14px;">No device connected: no workouts logged for the selected range.</td></tr>`;
                     return;
                 }
 
@@ -403,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td>${act.distance || '--'} km</td>
                         <td>${act.avg_hr || '--'} bpm</td>
                         <td>${act.calories || '--'} kcal</td>
-                        <td><span class="green-text">✓ Synced</span></td>
+                        <td><span class="green-text">Synced</span></td>
                     `;
                     row.addEventListener('click', () => openActivityModal(act));
                     activityTableBody.appendChild(row);
@@ -428,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const splitsContainer = document.getElementById('splits-container');
             const splitsTableBody = document.getElementById('splits-table-body');
-            splitsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading splits...</td></tr>';
+            splitsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading splits...</td></tr>';
             splitsContainer.style.display = 'block';
 
             const res = await fetch(`/api/v1/activities/${act.id}/splits`);
@@ -442,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const speed = split.averageSpeed ? (1000 / split.averageSpeed / 60) : 0; // pace in min/km
                         const paceMin = Math.floor(speed);
                         const paceSec = Math.round((speed - paceMin) * 60).toString().padStart(2, '0');
-                        const paceStr = speed > 0 ? `${paceMin}:${paceSec}` : '--';
+                        const paceStr = speed > 0 ? `${paceMin}:${paceSec} /km` : '--';
                         
                         let timeStr = '--';
                         if (split.duration) {
@@ -451,14 +487,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             timeStr = `${tMin}:${tSec}`;
                         }
                         
-                        const distStr = split.distance ? (split.distance / 1000).toFixed(2) : '--';
-                        const elevStr = split.elevationGain !== undefined ? `+${split.elevationGain.toFixed(0)}m` : '--';
-                        const cadenceStr = split.averageRunCadence ? Math.round(split.averageRunCadence) : '--';
-                        const hrStr = split.averageHR ? `${Math.round(split.averageHR)}` : '--';
+                        const distKm = split.distance ? (split.distance / 1000).toFixed(2) : '--';
+                        const distStr = split.distance ? `${distKm} km` : '--';
+                        const elevStr = split.elevationGain !== undefined && split.elevationGain !== null ? `+${Math.round(split.elevationGain)}m` : '--';
+                        const cadenceStr = split.averageRunCadence ? `${Math.round(split.averageRunCadence)} spm` : '--';
+                        const hrStr = split.averageHR ? `${Math.round(split.averageHR)} bpm` : '--';
                         const hrMaxStr = split.maxHR ? ` <span style="color:var(--text-muted);font-size:0.8em">(${Math.round(split.maxHR)})</span>` : '';
 
                         tr.innerHTML = `
-                            <td>${split.splitIndex || split.lapIndex || '-'}</td>
+                            <td style="font-weight:600;">${split.splitIndex || split.lapIndex || '-'}</td>
                             <td>${distStr}</td>
                             <td style="font-weight: 500;">${timeStr}</td>
                             <td>${paceStr}</td>

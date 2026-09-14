@@ -3,31 +3,504 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GarminSynapse — Performance Dashboard</title>
-    <meta name="description" content="GarminSynapse: Unified health engine, MCP server and sport performance dashboard for Garmin Connect.">
+    <title>GarminSynapse: Performance Dashboard</title>
+    <meta name="description" content="GarminSynapse: Unified health engine, MCP server, and sport performance dashboard for Garmin Connect.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/style.css">
-    <!-- Garmin Favicon -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css?v=20260914-4">
     <link rel="icon" href="https://www.garmin.com/favicon.ico" type="image/x-icon">
+    <style id="device-cockpit-styles">
+        .device-section {
+            margin-bottom: 24px;
+            border-radius: var(--radius-md, 10px);
+            background: linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(10, 15, 29, 0.98) 100%);
+            border: 1px solid rgba(14, 165, 233, 0.22);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+            overflow: hidden;
+        }
+        [data-theme="light"] .device-section {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid rgba(2, 132, 199, 0.2);
+            box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08);
+        }
+
+        .device-hud-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 18px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+        }
+        [data-theme="light"] .device-hud-bar {
+            background: rgba(15, 23, 42, 0.02);
+            border-bottom-color: rgba(15, 23, 42, 0.08);
+        }
+
+        .hud-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .garmin-delta-icon {
+            color: #38bdf8;
+            flex-shrink: 0;
+        }
+        .hud-title {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--text-secondary, #94a3b8);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .hud-sep {
+            color: var(--text-muted, #7b90ab);
+            opacity: 0.4;
+            font-size: 11px;
+        }
+        .hud-sku {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 10px;
+            font-weight: 600;
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            padding: 1px 6px;
+            border-radius: 3px;
+            letter-spacing: 0.03em;
+        }
+        [data-theme="light"] .hud-sku {
+            color: #0284c7;
+            background: rgba(2, 132, 199, 0.08);
+            border-color: rgba(2, 132, 199, 0.2);
+        }
+
+        .hud-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .hud-chip {
+            font-size: 9.5px;
+            font-weight: 600;
+            color: var(--text-muted, #7b90ab);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .hud-status-active {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #10b981;
+            letter-spacing: 0.04em;
+        }
+        .hud-status-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .device-cockpit {
+            display: flex;
+            align-items: stretch;
+            gap: 22px;
+            padding: 20px 22px;
+        }
+
+        .device-schematic-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 14px 16px;
+            background: radial-gradient(circle at center, rgba(14, 165, 233, 0.1) 0%, rgba(255, 255, 255, 0.015) 75%);
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+            border-radius: var(--radius-sm, 6px);
+            flex-shrink: 0;
+            min-width: 155px;
+        }
+        [data-theme="light"] .device-schematic-col {
+            background: radial-gradient(circle at center, rgba(2, 132, 199, 0.08) 0%, rgba(15, 23, 42, 0.015) 75%);
+            border-color: rgba(15, 23, 42, 0.08);
+        }
+
+        .watch-case-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .garmin-watch-svg {
+            filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
+        }
+
+        .watch-meta-strip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .watch-meta-tag {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: var(--text-muted, #7b90ab);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+        [data-theme="light"] .watch-meta-tag {
+            background: rgba(15, 23, 42, 0.04);
+            border-color: rgba(15, 23, 42, 0.08);
+        }
+
+        .device-details-col {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .device-title-area {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .device-tags-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .device-category-pill {
+            font-size: 10px;
+            font-weight: 700;
+            color: #38bdf8;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        [data-theme="light"] .device-category-pill {
+            color: #0284c7;
+        }
+        .device-pill-primary {
+            font-size: 9.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 2px 7px;
+            border-radius: 4px;
+            background: rgba(14, 165, 233, 0.12);
+            color: #38bdf8;
+            border: 1px solid rgba(14, 165, 233, 0.28);
+            display: inline-flex;
+            align-items: center;
+        }
+        [data-theme="light"] .device-pill-primary {
+            background: rgba(2, 132, 199, 0.1);
+            color: #0284c7;
+            border-color: rgba(2, 132, 199, 0.25);
+        }
+        .device-tag-trueup {
+            font-size: 9.5px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-secondary, #94a3b8);
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+            display: inline-flex;
+            align-items: center;
+        }
+        [data-theme="light"] .device-tag-trueup {
+            background: rgba(15, 23, 42, 0.04);
+            border-color: rgba(15, 23, 42, 0.08);
+        }
+
+        .device-headline-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .device-model-name {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--text-primary, #f8fafc);
+            letter-spacing: -0.02em;
+            margin: 0;
+            font-family: var(--font-heading, 'Outfit', sans-serif);
+        }
+        .device-edition-badge {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted, #7b90ab);
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        [data-theme="light"] .device-edition-badge {
+            background: rgba(15, 23, 42, 0.04);
+            border-color: rgba(15, 23, 42, 0.08);
+        }
+
+        .device-telemetry-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            width: 100%;
+        }
+
+        .telemetry-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+            border-radius: 6px;
+            padding: 9px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .telemetry-box:hover {
+            border-color: var(--border-hover, rgba(255, 255, 255, 0.16));
+            background: rgba(255, 255, 255, 0.04);
+        }
+        [data-theme="light"] .telemetry-box {
+            background: rgba(15, 23, 42, 0.02);
+            border-color: rgba(15, 23, 42, 0.08);
+        }
+        [data-theme="light"] .telemetry-box:hover {
+            background: rgba(15, 23, 42, 0.04);
+            border-color: rgba(15, 23, 42, 0.16);
+        }
+
+        .telemetry-box-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .telemetry-icon {
+            color: #38bdf8;
+            flex-shrink: 0;
+        }
+        [data-theme="light"] .telemetry-icon {
+            color: #0284c7;
+        }
+        .telemetry-label {
+            font-size: 9.5px;
+            font-weight: 700;
+            color: var(--text-muted, #7b90ab);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .telemetry-value {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-primary, #f8fafc);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .telemetry-value.font-mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            letter-spacing: 0.03em;
+        }
+        .telemetry-value-inline {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .telemetry-micro-badge {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #10b981;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            border-radius: 3px;
+            padding: 1px 4px;
+        }
+
+        .device-capabilities-strip {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            padding-top: 6px;
+            border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+        }
+        [data-theme="light"] .device-capabilities-strip {
+            border-top-color: rgba(15, 23, 42, 0.08);
+        }
+        .cap-item {
+            font-size: 11px;
+            color: var(--text-secondary, #94a3b8);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 500;
+        }
+        .cap-indicator {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #38bdf8;
+        }
+        [data-theme="light"] .cap-indicator {
+            background: #0284c7;
+        }
+
+        .device-link-col {
+            min-width: 200px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .link-cockpit-panel {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+            border-radius: var(--radius-sm, 6px);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        [data-theme="light"] .link-cockpit-panel {
+            background: rgba(15, 23, 42, 0.02);
+            border-color: rgba(15, 23, 42, 0.08);
+        }
+
+        .link-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm, 6px);
+            font-size: 12px;
+            font-weight: 700;
+            width: fit-content;
+        }
+        .link-status-badge--connected {
+            background: rgba(16, 185, 129, 0.12);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .link-status-badge--disconnected {
+            background: rgba(239, 68, 68, 0.12);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        [data-theme="light"] .link-status-badge--connected {
+            background: rgba(5, 150, 105, 0.1);
+            color: #059669;
+            border-color: rgba(5, 150, 105, 0.25);
+        }
+        [data-theme="light"] .link-status-badge--disconnected {
+            background: rgba(220, 38, 38, 0.1);
+            color: #dc2626;
+            border-color: rgba(220, 38, 38, 0.25);
+        }
+
+        .status-indicator-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+            flex-shrink: 0;
+        }
+        .link-subtext {
+            font-size: 11px;
+            color: var(--text-muted, #7b90ab);
+            margin-top: -4px;
+        }
+        .link-matrix {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+        }
+        [data-theme="light"] .link-matrix {
+            border-top-color: rgba(15, 23, 42, 0.08);
+        }
+        .link-matrix-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        .matrix-key {
+            color: var(--text-muted, #7b90ab);
+        }
+        .matrix-val {
+            color: var(--text-secondary, #94a3b8);
+            font-weight: 600;
+        }
+        .matrix-val--green {
+            color: #10b981;
+            font-weight: 700;
+        }
+        [data-theme="light"] .matrix-val--green {
+            color: #059669;
+        }
+
+        @media (max-width: 960px) {
+            .device-cockpit {
+                flex-direction: column;
+                gap: 16px;
+                padding: 16px;
+            }
+            .device-schematic-col {
+                flex-direction: row;
+                justify-content: flex-start;
+                width: 100%;
+                min-width: auto;
+                padding: 12px 16px;
+                gap: 20px;
+            }
+            .device-telemetry-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .device-link-col {
+                min-width: 100%;
+                width: 100%;
+            }
+        }
+        @media (max-width: 600px) {
+            .device-hud-bar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+                padding: 8px 12px;
+            }
+            .hud-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .device-schematic-col {
+                flex-direction: column;
+                align-items: center;
+            }
+            .device-telemetry-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-    <!-- Animated Background -->
-    <div class="bg-scene">
-        <div class="bg-orb bg-orb--1"></div>
-        <div class="bg-orb bg-orb--2"></div>
-        <div class="bg-orb bg-orb--3"></div>
-        <div class="bg-grid"></div>
-    </div>
-
-    <!-- ========== LOGIN MODAL ========== -->
     <div id="login-modal" class="modal-backdrop">
-        <div class="glass modal-card login-card">
+        <div class="modal-card login-card">
             <div class="modal-header">
                 <img src="https://cdn.worldvectorlogo.com/logos/garmin-logo-1.svg" alt="Garmin" class="garmin-logo login-logo" id="login-garmin-logo">
                 <h2>Connect to Garmin</h2>
-                <p class="modal-subtext">Dual-engine authentication — curl_cffi with Playwright fallback</p>
+                <p class="modal-subtext">Dual-engine authentication: curl_cffi with Playwright fallback</p>
             </div>
             <form id="login-form">
                 <div class="form-group">
@@ -49,14 +522,13 @@
                     <span id="login-btn-text">Authenticate & Sync</span>
                     <span id="login-spinner" class="spinner hidden"></span>
                 </button>
-                <p class="login-footer">Powered by <strong>GarminSynapse</strong> v0.1.0</p>
+                <p class="login-footer">Powered by <strong>GarminSynapse</strong> v0.4.1</p>
             </form>
         </div>
     </div>
 
-    <!-- ========== ACTIVITY DETAILS MODAL ========== -->
     <div id="activity-modal" class="modal-backdrop hidden">
-        <div class="glass modal-card detail-modal">
+        <div class="modal-card detail-modal">
             <div class="modal-top-bar">
                 <div>
                     <h2 id="modal-act-name">Workout Details</h2>
@@ -99,23 +571,22 @@
                 </div>
             </div>
             
-            <div class="modal-splits-section" style="margin-top: 1.5rem; display: none;" id="splits-container">
-                <h3 style="font-size: 1rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Splits / Laps</h3>
-                <div class="table-container glass">
-                    <table class="activities-table" style="font-size: 0.85rem;">
+            <div class="modal-splits-section" id="splits-container">
+                <h3 class="splits-title">Splits / Laps</h3>
+                <div class="table-container">
+                    <table class="activities-table splits-table">
                         <thead>
                             <tr>
-                                <th>Lap</th>
+                                <th>Split</th>
                                 <th>Dist</th>
                                 <th>Time</th>
                                 <th>Pace</th>
-                                <th>HR (Max)</th>
+                                <th>HR (Avg)</th>
                                 <th>Cadence</th>
                                 <th>Elev</th>
                             </tr>
                         </thead>
                         <tbody id="splits-table-body">
-                            <!-- Populated via JS -->
                         </tbody>
                     </table>
                 </div>
@@ -123,10 +594,7 @@
         </div>
     </div>
 
-    <!-- ========== MAIN DASHBOARD ========== -->
     <div class="app-container hidden" id="dashboard-container">
-
-        <!-- Navbar -->
         <header class="navbar glass">
             <div class="brand">
                 <img src="https://cdn.worldvectorlogo.com/logos/garmin-logo-1.svg" alt="Garmin" class="garmin-logo nav-logo" id="nav-garmin-logo">
@@ -155,13 +623,12 @@
             </div>
         </header>
 
-        <!-- Date Range Filter -->
-        <section class="date-filter-bar glass">
+        <section class="date-filter-bar">
             <div class="date-inputs">
                 <svg class="filter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                <input type="date" id="start-date-input" class="date-picker">
-                <span class="date-sep">→</span>
-                <input type="date" id="end-date-input" class="date-picker">
+                <input type="date" id="start-date-input" class="date-picker" aria-label="Start Date">
+                <span class="date-sep">to</span>
+                <input type="date" id="end-date-input" class="date-picker" aria-label="End Date">
                 <button id="apply-date-filter" class="btn primary-btn sm-btn">Apply</button>
             </div>
             <div class="quick-presets">
@@ -173,135 +640,338 @@
         </section>
 
         <main class="content-grid">
-            <!-- Connected Garmin Device Section -->
-            <section class="device-section glass" id="device-card-section" style="margin-bottom: 24px; padding: 18px 24px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(255,255,255,0.1);">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <div style="background: rgba(0, 150, 255, 0.15); padding: 12px; border-radius: 12px; color: #0096ff; display: flex; align-items: center; justify-content: center;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><circle cx="12" cy="12" r="7"/><polyline points="12 9 12 12 13.5 13.5"/><path d="M16.51 17.35l-.35 3.83a2 2 0 0 1-2 1.82H9.83a2 2 0 0 1-2-1.82l-.35-3.83m.01-10.7l.35-3.83A2 2 0 0 1 9.83 1h4.35a2 2 0 0 1 2 1.82l.35 3.83"/></svg>
+            <section class="device-section" id="device-card-section">
+                <!-- Top Telemetry Header Bar -->
+                <div class="device-hud-bar">
+                    <div class="hud-left">
+                        <svg class="garmin-delta-icon" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
+                            <path d="M12 2L1 21h22L12 2zm0 5.2L18.8 19H5.2L12 7.2z"/>
+                        </svg>
+                        <span class="hud-title">GARMIN HARDWARE TELEMETRY</span>
+                        <span class="hud-sep">//</span>
+                        <span class="hud-sku" id="device-sku-badge">SKU 010-02970-42</span>
                     </div>
-                    <div>
-                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700;">Garmin Hardware & Device</div>
-                        <div id="device-model-name" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">Checking device...</div>
-                        <div id="device-extra-info" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">--</div>
+                    <div class="hud-right">
+                        <span class="hud-chip">MULTI-GNSS CONSTELLATION</span>
+                        <span class="hud-status-active"><span class="hud-status-dot"></span> TELEMETRY ACTIVE</span>
                     </div>
                 </div>
-                <div id="device-status-badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-                    ● Active
+
+                <!-- Main Device Cockpit -->
+                <div class="device-cockpit">
+                    <!-- Column 1: Athletic Watch Illustration -->
+                    <div class="device-schematic-col">
+                        <div class="watch-case-display">
+                            <svg class="garmin-watch-svg" viewBox="0 0 160 160" width="132" height="132" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Garmin Forerunner 570">
+                                <defs>
+                                    <linearGradient id="bezelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#334155"/>
+                                        <stop offset="50%" stop-color="#1e293b"/>
+                                        <stop offset="100%" stop-color="#0f172a"/>
+                                    </linearGradient>
+                                    <linearGradient id="caseGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stop-color="#1e293b"/>
+                                        <stop offset="100%" stop-color="#090d16"/>
+                                    </linearGradient>
+                                    <linearGradient id="strapGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stop-color="#0f172a"/>
+                                        <stop offset="50%" stop-color="#1e293b"/>
+                                        <stop offset="100%" stop-color="#0f172a"/>
+                                    </linearGradient>
+                                    <radialGradient id="screenGlow" cx="50%" cy="50%" r="50%">
+                                        <stop offset="0%" stop-color="#0a192f"/>
+                                        <stop offset="85%" stop-color="#020617"/>
+                                        <stop offset="100%" stop-color="#000000"/>
+                                    </radialGradient>
+                                    <linearGradient id="stepArcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#38bdf8"/>
+                                        <stop offset="100%" stop-color="#0ea5e9"/>
+                                    </linearGradient>
+                                </defs>
+
+                                <!-- Top Strap with textured ribs -->
+                                <path d="M56 4h48v30H56z" fill="url(#strapGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="1.2" rx="4"/>
+                                <line x1="62" y1="10" x2="98" y2="10" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" stroke-linecap="round"/>
+                                <line x1="62" y1="16" x2="98" y2="16" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" stroke-linecap="round"/>
+                                <line x1="62" y1="22" x2="98" y2="22" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" stroke-linecap="round"/>
+                                
+                                <!-- Bottom Strap with textured ribs -->
+                                <path d="M56 126h48v30H56z" fill="url(#strapGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="1.2" rx="4"/>
+                                <line x1="62" y1="134" x2="98" y2="134" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" stroke-linecap="round"/>
+                                <line x1="62" y1="140" x2="98" y2="140" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" stroke-linecap="round"/>
+                                <line x1="62" y1="146" x2="98" y2="146" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" stroke-linecap="round"/>
+
+                                <!-- Left Pushers: LIGHT, UP, DOWN -->
+                                <rect x="23" y="52" width="5" height="12" rx="2.5" fill="#64748b" stroke="#334155" stroke-width="0.8"/>
+                                <rect x="21" y="72" width="5" height="14" rx="2.5" fill="#64748b" stroke="#334155" stroke-width="0.8"/>
+                                <rect x="23" y="94" width="5" height="12" rx="2.5" fill="#64748b" stroke="#334155" stroke-width="0.8"/>
+
+                                <!-- Right Pushers: START/STOP (with signature athletic orange accent ring) & BACK -->
+                                <rect x="132" y="53" width="6" height="16" rx="3" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
+                                <rect x="132" y="91" width="5" height="13" rx="2.5" fill="#64748b" stroke="#334155" stroke-width="0.8"/>
+
+                                <!-- Outer Watch Case with Fiber-reinforced polymer finish -->
+                                <circle cx="80" cy="80" r="54" fill="url(#caseGrad)" stroke="rgba(255,255,255,0.12)" stroke-width="1.8"/>
+                                
+                                <!-- Outer Titanium Bezel Ring -->
+                                <circle cx="80" cy="80" r="48" fill="url(#bezelGrad)" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.4"/>
+
+                                <!-- 4 Bezel Hex Screws at 45°, 135°, 225°, 315° -->
+                                <circle cx="48" cy="48" r="1.8" fill="#94a3b8"/>
+                                <circle cx="112" cy="48" r="1.8" fill="#94a3b8"/>
+                                <circle cx="48" cy="112" r="1.8" fill="#94a3b8"/>
+                                <circle cx="112" cy="112" r="1.8" fill="#94a3b8"/>
+
+                                <!-- Bezel Index Ticks -->
+                                <line x1="80" y1="34" x2="80" y2="39" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+                                <line x1="126" y1="80" x2="121" y2="80" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+                                <line x1="80" y1="126" x2="80" y2="121" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+                                <line x1="34" y1="80" x2="39" y2="80" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+
+                                <!-- Watch Display Screen (AMOLED Black) -->
+                                <circle cx="80" cy="80" r="39" fill="url(#screenGlow)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+                                
+                                <!-- Circular Step / Activity Progress Arc (270 deg) -->
+                                <path d="M 52 80 A 28 28 0 1 1 80 108" fill="none" stroke="url(#stepArcGrad)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="140" stroke-dashoffset="30"/>
+
+                                <!-- Dial Top: Garmin Delta Emblem -->
+                                <path d="M80 49L76 56h8L80 49z" fill="#38bdf8"/>
+                                
+                                <!-- Dial Center: Bold Athletic Digital Clock -->
+                                <text x="80" y="73" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="800" font-family="'Inter', sans-serif" letter-spacing="-0.5">10:08</text>
+                                
+                                <!-- Dial Sub: Seconds & Live State -->
+                                <text x="80" y="83" text-anchor="middle" fill="#38bdf8" font-size="7" font-weight="700" font-family="monospace" letter-spacing="0.8">GPS • READY</text>
+
+                                <!-- Dial Heart Rate Pulse Wave -->
+                                <path d="M56 94h8l2.5-5 4 10 3-7 2.5 2h18" fill="none" stroke="#10b981" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                                
+                                <!-- Dial HR bpm readout -->
+                                <text x="96" y="93" fill="#10b981" font-size="6.5" font-weight="700" font-family="'Inter', sans-serif">72</text>
+                                <text x="105" y="93" fill="#64748b" font-size="5" font-weight="500" font-family="'Inter', sans-serif">BPM</text>
+
+                                <!-- Center Pivot Indicator -->
+                                <circle cx="80" cy="80" r="1.5" fill="#38bdf8"/>
+                            </svg>
+                        </div>
+                        <div class="watch-meta-strip">
+                            <span class="watch-meta-tag">42MM CASE</span>
+                            <span class="watch-meta-tag">AMOLED MIP</span>
+                            <span class="watch-meta-tag">5 ATM</span>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Specs & Hardware Details -->
+                    <div class="device-details-col">
+                        <div class="device-title-area">
+                            <div class="device-tags-bar">
+                                <span class="device-category-pill">GPS RUNNING SMARTWATCH</span>
+                                <span class="device-pill-primary" id="device-primary-tag">PRIMARY TRACKER</span>
+                                <span class="device-tag-trueup">TrueUp™ Active</span>
+                            </div>
+                            <div class="device-headline-row">
+                                <h2 id="device-model-name" class="device-model-name">Forerunner 570 - 42mm</h2>
+                                <span class="device-edition-badge">Slate Graphite Edition</span>
+                            </div>
+                        </div>
+
+                        <!-- 4-Box Telemetry Grid -->
+                        <div class="device-telemetry-grid">
+                            <div class="telemetry-box">
+                                <div class="telemetry-box-header">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" class="telemetry-icon" aria-hidden="true">
+                                        <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                                        <path d="M7 8h10M7 12h10M7 16h6"></path>
+                                    </svg>
+                                    <span class="telemetry-label">SERIAL NUMBER</span>
+                                </div>
+                                <span class="telemetry-value font-mono" id="device-sn-val">8N9051741</span>
+                            </div>
+
+                            <div class="telemetry-box">
+                                <div class="telemetry-box-header">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" class="telemetry-icon" aria-hidden="true">
+                                        <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                                        <rect x="9" y="9" width="6" height="6"></rect>
+                                        <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"></path>
+                                    </svg>
+                                    <span class="telemetry-label">UNIT ID</span>
+                                </div>
+                                <span class="telemetry-value font-mono" id="device-unitid-val">3637876318</span>
+                            </div>
+
+                            <div class="telemetry-box">
+                                <div class="telemetry-box-header">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" class="telemetry-icon" aria-hidden="true">
+                                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                                    </svg>
+                                    <span class="telemetry-label">FIRMWARE</span>
+                                </div>
+                                <div class="telemetry-value-inline">
+                                    <span class="telemetry-value font-mono" id="device-fw-val">v18.29</span>
+                                    <span class="telemetry-micro-badge">STABLE</span>
+                                </div>
+                            </div>
+
+                            <div class="telemetry-box">
+                                <div class="telemetry-box-header">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" class="telemetry-icon" aria-hidden="true">
+                                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                                    </svg>
+                                    <span class="telemetry-label">BIOMETRIC SUITE</span>
+                                </div>
+                                <span class="telemetry-value" id="device-sensor-val">Elevate™ Optical HR</span>
+                            </div>
+                        </div>
+
+                        <!-- Hardware Sensor Capability Bar -->
+                        <div class="device-capabilities-strip">
+                            <span class="cap-item"><span class="cap-indicator"></span> Multi-Band GNSS</span>
+                            <span class="cap-item"><span class="cap-indicator"></span> Wrist Heart Rate</span>
+                            <span class="cap-item"><span class="cap-indicator"></span> Pulse Ox & VO2 Max</span>
+                            <span class="cap-item"><span class="cap-indicator"></span> Body Battery™</span>
+                            <span class="cap-item"><span class="cap-indicator"></span> NFC Garmin Pay</span>
+                        </div>
+                    </div>
+
+                    <!-- Column 3: Link Status & Connection Cockpit -->
+                    <div class="device-link-col">
+                        <div class="link-cockpit-panel">
+                            <div class="link-status-badge link-status-badge--connected" id="device-status-badge">
+                                <span class="status-indicator-dot"></span>
+                                <span id="device-status-text" class="status-text-main">Connected</span>
+                            </div>
+                            <span class="link-subtext" id="device-status-subtext">Garmin Connect Active</span>
+
+                            <div class="link-matrix">
+                                <div class="link-matrix-row">
+                                    <span class="matrix-key">Cloud Link</span>
+                                    <span class="matrix-val matrix-val--green">Active</span>
+                                </div>
+                                <div class="link-matrix-row">
+                                    <span class="matrix-key">Data Stream</span>
+                                    <span class="matrix-val">FIT 2.0 Binary</span>
+                                </div>
+                                <div class="link-matrix-row">
+                                    <span class="matrix-key">Sync Protocol</span>
+                                    <span class="matrix-val">OAuth / REST</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <!-- Health Overview Cards -->
             <section class="overview-section">
                 <h2 class="section-title">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     Health & Biometric Overview
                 </h2>
                 <div class="dashboard-cards">
-                    <div class="card glass card--steps">
+                    <div class="card card--steps">
                         <div class="card-header">
-                            <div class="card-icon-wrap card-icon--blue">
+                            <div class="card-icon-wrap">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                             </div>
-                            <span class="card-title">Daily Steps</span>
+                            <span class="card-title" id="steps-card-title">Daily Steps</span>
                         </div>
                         <div class="metric-value" id="steps-value">--</div>
                         <div class="progress-bar-bg">
                             <div class="progress-bar-fill" id="steps-bar" style="width: 0%;"></div>
                         </div>
-                        <span class="metric-subtext">Goal: 10,000 steps</span>
+                        <span class="metric-subtext" id="steps-subtext">Goal: 10,000 steps</span>
                     </div>
 
-                    <div class="card glass card--hr">
+                    <div class="card card--hr">
                         <div class="card-header">
-                            <div class="card-icon-wrap card-icon--red">
+                            <div class="card-icon-wrap">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 000-7.78z"/></svg>
                             </div>
-                            <span class="card-title">Resting HR</span>
+                            <span class="card-title" id="hr-card-title">Resting HR</span>
                         </div>
                         <div class="metric-value" id="hr-value">-- <span class="unit">bpm</span></div>
-                        <span class="metric-subtext accent-green">✓ Heart Health</span>
+                        <span class="metric-subtext" id="hr-subtext">Resting Heart Rate</span>
                     </div>
 
-                    <div class="card glass card--sleep">
+                    <div class="card card--sleep">
                         <div class="card-header">
-                            <div class="card-icon-wrap card-icon--purple">
+                            <div class="card-icon-wrap">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
                             </div>
-                            <span class="card-title">Sleep Score</span>
+                            <span class="card-title" id="sleep-card-title">Sleep Score</span>
                         </div>
                         <div class="metric-value" id="sleep-score">-- <span class="unit">/ 100</span></div>
-                        <span class="metric-subtext accent-purple">Restorative Sleep</span>
+                        <span class="metric-subtext" id="sleep-subtext">Restorative Sleep</span>
                     </div>
 
-                    <div class="card glass card--battery">
+                    <div class="card card--battery">
                         <div class="card-header">
-                            <div class="card-icon-wrap card-icon--cyan">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="6" width="18" height="12" rx="2"/><path d="M23 13v-2"/><path d="M7 10v4M11 10v4"/></svg>
+                            <div class="card-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="6" width="18" height="12" rx="2"/><path d="M23 13v-2"/></svg>
                             </div>
-                            <span class="card-title">Body Battery</span>
+                            <span class="card-title" id="battery-card-title">Body Battery</span>
                         </div>
                         <div class="metric-value" id="battery-value">-- <span class="unit">%</span></div>
-                        <span class="metric-subtext accent-cyan">Energy Level</span>
+                        <span class="metric-subtext" id="battery-subtext">Energy Reserve Level</span>
                     </div>
 
-                    <div class="card glass card--hrv">
+                    <div class="card card--hrv">
                         <div class="card-header">
-                            <div class="card-icon-wrap card-icon--teal">
+                            <div class="card-icon-wrap">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                             </div>
-                            <span class="card-title">HRV Status</span>
+                            <span class="card-title" id="hrv-card-title">HRV Status</span>
                         </div>
                         <div class="metric-value" id="hrv-value">-- <span class="unit">ms</span></div>
-                        <span class="metric-subtext accent-cyan">7-Day Baseline</span>
+                        <span class="metric-subtext" id="hrv-subtext">7-Day Baseline</span>
                     </div>
 
-                    <div class="card glass card--stress">
+                    <div class="card card--stress">
                         <div class="card-header">
-                            <div class="card-icon-wrap card-icon--orange">
+                            <div class="card-icon-wrap">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
                             </div>
-                            <span class="card-title">Stress Level</span>
+                            <span class="card-title" id="stress-card-title">Stress Level</span>
                         </div>
                         <div class="metric-value" id="stress-value">-- <span class="unit">/ 100</span></div>
-                        <span class="metric-subtext accent-green">Recovery Status</span>
+                        <span class="metric-subtext" id="stress-subtext">Daily Stress Average</span>
                     </div>
 
-                    <div class="card glass card--resp">
+                    <div class="card card--resp">
                         <div class="card-header">
-                            <div class="card-icon-wrap card-icon--indigo">
+                            <div class="card-icon-wrap">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5 0 8-3.58 8-8V6a4 4 0 00-4-4H8a4 4 0 00-4 4v8c0 4.42 3 8 8 8z"/></svg>
                             </div>
                             <span class="card-title">Respiration</span>
                         </div>
                         <div class="metric-value" id="resp-value">-- <span class="unit">brpm</span></div>
-                        <span class="metric-subtext accent-purple">Breath Rate</span>
+                        <span class="metric-subtext">Breaths per Minute</span>
                     </div>
 
-                    <div class="card glass card--spo2">
+                    <div class="card card--spo2">
                         <div class="card-header">
-                            <div class="card-icon-wrap card-icon--rose">
+                            <div class="card-icon-wrap">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>
                             </div>
                             <span class="card-title">Pulse Ox (SpO2)</span>
                         </div>
                         <div class="metric-value" id="spo2-value">-- <span class="unit">%</span></div>
-                        <span class="metric-subtext accent-green">Blood Oxygen</span>
+                        <span class="metric-subtext">Blood Oxygen Saturation</span>
                     </div>
 
-                    <div class="card glass card--readiness">
+                    <div class="card card--readiness">
                         <div class="card-header">
-                            <div class="card-icon-wrap card-icon--orange">
+                            <div class="card-icon-wrap">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                             </div>
                             <span class="card-title">Training Readiness</span>
                         </div>
                         <div class="metric-value" id="readiness-value">-- <span class="unit">/ 100</span></div>
-                        <span class="metric-subtext accent-cyan" id="readiness-subtext">Optimal Recovery</span>
+                        <span class="metric-subtext" id="readiness-subtext">Optimal Recovery</span>
                     </div>
                 </div>
             </section>
 
-            <!-- Activities Feed -->
             <section class="activities-section">
                 <div class="section-header">
                     <h2 class="section-title">
@@ -310,7 +980,7 @@
                     </h2>
                     <span class="count-badge" id="activity-count">Loading...</span>
                 </div>
-                <div class="table-container glass">
+                <div class="table-container">
                     <table class="activities-table">
                         <thead>
                             <tr>
@@ -332,9 +1002,9 @@
         </main>
 
         <footer class="app-footer">
-            <span>GarminSynapse v0.3.0 — Open Source Health Engine & MCP Server</span>
+            <span>GarminSynapse v0.4.1 (Health Engine & MCP Server)</span>
         </footer>
     </div>
-    <script src="/js/app.js?v=1.4.0"></script>
+    <script src="/js/app.js?v=0.4.1"></script>
 </body>
 </html>

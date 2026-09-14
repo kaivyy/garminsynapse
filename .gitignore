@@ -50,3 +50,7 @@ ENV/
 # Graphify
 graphify-out/
 
+# Local server scripts
+ecosystem.config.cjs
+mcp_http_server.py
+mcp_stdio_server.py

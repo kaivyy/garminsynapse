@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.1] - 2026-09-14
+
+### 🎨 Garmin Hardware Telemetry Cockpit & UI Enhancements
+
+- **Engineered Hardware Telemetry Cockpit** (`web/static/`):
+  - Completely redesigned device section into a high-precision athletic hardware cockpit compliant with `antislop-ui` standards.
+  - **High-Definition Smartwatch Graphic**: Multi-layered vector illustration of the Garmin Forerunner GPS smartwatch featuring brushed titanium bezel, 4 hex-screws, 5 ergonomic physical pushers (including signature athletic orange `START/STOP` ring), ribbed silicone straps, and an AMOLED watch face with active ECG pulse wave, step progress arc, and digital time.
+  - **4-Box Modular Telemetry Pods**: Monospace hardware identifiers for Serial Number (`8N9051741`), Unit ID (`3637876318`), Firmware (`v18.29` with `STABLE` badge), and Biometric Sensor Suite (`Elevate™ Gen 4`).
+  - **HUD Telemetry Eyebrow & Capabilities Bar**: Top HUD banner with Garmin Delta emblem, SKU badge (`010-02970-42`), satellite constellation readout (`MULTI-GNSS`), and sensor capabilities strip (`Multi-Band GNSS`, `Wrist HR`, `Pulse Ox & VO2 Max`, `Body Battery™`, `NFC Pay`).
+  - **Live Connection Cockpit**: Dedicated right-hand status panel with solid status dot, Garmin Connect link status, and data stream matrix (`FIT 2.0 Binary`, `OAuth / REST`).
+
+### ⚡ Anti-Cache & Web Reliability
+
+- **NoCacheStaticMiddleware** (`web/app.py`):
+  - Added Starlette/FastAPI middleware attaching `Cache-Control: no-cache, no-store, must-revalidate`, `Pragma: no-cache`, and `Expires: 0` headers to all static assets (`.css`, `.js`, `.html`).
+  - Completely eliminates stale browser CSS/JS caching issues during development and local runtime.
+- **Inline Critical Stylesheet Fallback** (`web/static/index.html`):
+  - Injected complete scoped stylesheet in `<head>` for immediate, zero-latency rendering of cockpit elements.
+  - Added cache-busting version query parameters (`?v=20260914-4`).
+
+### 🏃 Splits & Multi-Day Analytics Fixes
+
+- **1km Split Normalization Engine** (`core/api.py`):
+  - Normalized split distance intervals in Garmin activity splits; corrects mid-run distance anomalies (e.g. random 0.5km splits mid-workout) to ensure accurate 1km splits indexing.
+- **Multi-Day Date Range Summary Aggregations** (`web/routes.py`, `web/static/js/app.js`):
+  - Fixed resting heart rate display and multi-day range total calculations.
+  - Activities section now computes and presents dynamic totals for distance, duration, and calories across selected filter ranges.
+- **User ID Unification in ETL Processor** (`etl/processor.py`):
+  - Unified user ID resolution during batch ingest to prevent mismatched user records in local SQLite database.
+
 ## [v0.4.0] - 2026-09-14
 
 ### 🚀 Major Features & Performance Upgrades
