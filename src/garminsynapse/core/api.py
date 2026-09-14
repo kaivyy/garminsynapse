@@ -153,12 +153,18 @@ class GarminAPI:
 
     @with_auto_retry
     def get_activities(self, start: int = 0, limit: int = 20) -> List[Dict[str, Any]]:
-        """Fetch list of user activities with pagination."""
+        """Fetch list of user activities with pagination.
+
+        Raises on a non-200 response instead of returning an empty list, so
+        callers (e.g. pagination loops) can distinguish a genuine "no more
+        activities" signal from a transient/auth failure.
+        """
         if self._garmin_instance:
             return self._garmin_instance.get_activities(start, limit)
         url = f"{self.base_url}/activitylist-service/activities/search/activities"
         resp = self.session.get(url, params={"start": start, "limit": limit})
-        return resp.json() if resp.status_code == 200 else []
+        resp.raise_for_status()
+        return resp.json()
 
     @with_auto_retry
     def get_activity_details(self, activity_id: int) -> Dict[str, Any]:

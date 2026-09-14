@@ -47,7 +47,9 @@ class TestFetchActivitiesSince:
         start_date = datetime(2026, 2, 1)
         result = extractor._fetch_activities_since(api, start_date)
 
-        assert [a["activityId"] for a in result] == [1, 2, 3, 4]
+        # activity 4 (2026-01-01) is before start_date, so it should be excluded
+        # even though it arrived on the same page as in-window activity 3.
+        assert [a["activityId"] for a in result] == [1, 2, 3]
         assert api.get_activities.call_count == 2
 
     def test_stops_on_short_last_page(self):
@@ -94,6 +96,47 @@ class TestFetchActivitiesSince:
 
         assert result == []
         assert api.get_activities.call_count == 1
+
+
+class TestFetchActivitiesSinceApiFailure:
+    def test_api_failure_propagates_instead_of_being_treated_as_end_of_history(self):
+        """A raised API error (e.g. transient/auth failure) must not be
+        swallowed as if it were a genuine empty/end-of-history page, since
+        that would silently drop the remaining, not-yet-fetched activities.
+        """
+        extractor = GarminExtractor.__new__(GarminExtractor)
+        extractor._ACTIVITY_PAGE_SIZE = 2
+        extractor._ACTIVITY_SAFETY_MAX_PAGES = 10
+
+        page1 = [_activity(1, "2026-03-10 10:00:00"), _activity(2, "2026-03-09 10:00:00")]
+        api = MagicMock()
+        api.get_activities.side_effect = [page1, RuntimeError("boom")]
+
+        try:
+            extractor._fetch_activities_since(api, datetime(2000, 1, 1))
+            assert False, "expected the API failure to propagate"
+        except RuntimeError:
+            pass
+
+
+class TestExtractAllRetainsPreviousIngestOnFailure:
+    def test_extract_all_does_not_overwrite_ingest_file_when_fetch_fails(self, tmp_path, monkeypatch):
+        extractor = GarminExtractor(ingest_dir=tmp_path)
+        monkeypatch.setattr(extractor.auth_mgr, "get_active_tokens", lambda *a, **k: {"access_token": "fake"})
+
+        existing_path = tmp_path / "activities_list.json"
+        existing_path.write_text('[{"activityId": 999}]')
+
+        def failing_fetch(self, api, start_date):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(GarminExtractor, "_fetch_activities_since", failing_fetch)
+        monkeypatch.setattr("garminsynapse.etl.extractor.GarminAPI", lambda *a, **k: MagicMock())
+
+        extractor.extract_all(days=1)
+
+        import json
+        assert json.loads(existing_path.read_text()) == [{"activityId": 999}]
 
 
 class TestExtractAllUsesPagination:

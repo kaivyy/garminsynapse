@@ -116,20 +116,44 @@ class GarminExtractor:
         oldest activity on a page predates start_date, a short/empty page signals
         we've reached the end of the account's history, or a safety page-count cap
         is hit (bounds worst-case API calls for very long activity histories).
+
+        `api.get_activities` raises on a genuine API failure rather than
+        returning an empty list, so an empty page here always means "no more
+        activities" and a raised exception always means the fetch failed and
+        should propagate (the caller's extract_all keeps the previous ingest
+        file rather than overwriting it with a partial result).
         """
         all_activities: List[Dict[str, Any]] = []
         page_start = 0
+        reached_natural_end = False
         for _ in range(self._ACTIVITY_SAFETY_MAX_PAGES):
             page = api.get_activities(start=page_start, limit=self._ACTIVITY_PAGE_SIZE)
             if not page:
+                reached_natural_end = True
                 break
-            all_activities.extend(page)
+            # Filter out-of-window records before extending, since the page
+            # that first crosses start_date can contain a mix of in-window
+            # and older activities.
+            in_window = [
+                a for a in page
+                if (dt := self._parse_activity_start(a)) is None or dt >= start_date
+            ]
+            all_activities.extend(in_window)
             if len(page) < self._ACTIVITY_PAGE_SIZE:
+                reached_natural_end = True
                 break
             oldest_dt = self._parse_activity_start(page[-1])
             if oldest_dt is not None and oldest_dt < start_date:
+                reached_natural_end = True
                 break
             page_start += self._ACTIVITY_PAGE_SIZE
+        if not reached_natural_end:
+            logger.warning(
+                f"Activity pagination stopped after the safety cap of "
+                f"{self._ACTIVITY_SAFETY_MAX_PAGES} pages without reaching the end of "
+                f"the account's history or the requested date window; this sync may be "
+                f"partial. Re-run sync to continue fetching older activities."
+            )
         return all_activities
 
     def _save_endpoint_json(self, api: GarminAPI, method_name: str, date_str: str, filename: str) -> None:
