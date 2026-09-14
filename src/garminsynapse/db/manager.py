@@ -44,7 +44,6 @@ class DatabaseManager:
     def _migrate_columns(self) -> None:
         """Automatically add any missing columns in existing SQLite tables."""
         with self.engine.connect() as conn:
-            # Check sleep table for nap_seconds
             try:
                 res = conn.execute(text("PRAGMA table_info(sleep);")).fetchall()
                 cols = {row[1] for row in res}

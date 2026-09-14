@@ -86,7 +86,6 @@ def get_devices(force: bool = False):
     import time
     now = time.time()
     
-    # Return cached device data if valid and not forced
     if not force and _DEVICE_CACHE["data"] and (now - _DEVICE_CACHE["timestamp"] < _DEVICE_CACHE_TTL):
         return JSONResponse(_DEVICE_CACHE["data"])
 
@@ -110,7 +109,7 @@ def get_devices(force: bool = False):
         return JSONResponse({"status": "error", "message": "Not authenticated with Garmin", "devices": [], "primary": None})
     except Exception as e:
         logger.error(f"Failed to fetch devices: {e}")
-        # If cache exists on error, return stale cache
+        # Fall back to stale cache on error.
         if _DEVICE_CACHE["data"]:
             return JSONResponse(_DEVICE_CACHE["data"])
         return JSONResponse({"status": "error", "message": str(e), "devices": [], "primary": None})
@@ -143,7 +142,6 @@ def get_live_metrics():
     live_hr = None
     steps = None
 
-    # Body Battery
     try:
         bb = g.get_body_battery(today)
         if isinstance(bb, list) and bb:
@@ -158,7 +156,6 @@ def get_live_metrics():
     except Exception as e:
         logger.debug(f"Live BB fetch error: {e}")
 
-    # Stress
     try:
         stress = g.get_stress_data(today)
         if isinstance(stress, dict):
@@ -178,7 +175,6 @@ def get_live_metrics():
     except Exception as e:
         logger.debug(f"Live stress fetch error: {e}")
 
-    # Daily Steps & Summary
     try:
         steps_list = g.get_daily_steps(today, today)
         if steps_list and isinstance(steps_list, list):
@@ -195,7 +191,6 @@ def get_live_metrics():
     except Exception:
         pass
 
-    # Sleep & Nap Data
     sleep_score = None
     sleep_duration_mins = None
     nap_duration_mins = None
@@ -260,11 +255,9 @@ def summary(
     vo2_max = None
 
     try:
-        # Parse dates if provided
         start_d = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
         end_d = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
 
-        # DailySummary query (Steps, RHR, SpO2, Respiration)
         daily_q = session.query(DailySummary)
         if start_d and end_d:
             daily_q = daily_q.filter(DailySummary.calendar_date.between(start_d, end_d))
@@ -275,7 +268,6 @@ def summary(
             if daily_rec.avg_respiration is not None: respiration_rate = daily_rec.avg_respiration
             if daily_rec.avg_spo2 is not None: spo2 = daily_rec.avg_spo2
 
-        # Sleep query
         sleep_q = session.query(Sleep)
         if start_d and end_d:
             sleep_q = sleep_q.filter(Sleep.calendar_date.between(start_d, end_d))
@@ -283,7 +275,6 @@ def summary(
         if sleep_rec and sleep_rec.sleep_score:
             sleep_score = sleep_rec.sleep_score
             
-        # HRV query
         hrv_q = session.query(HRV)
         if start_d and end_d:
             hrv_q = hrv_q.filter(HRV.calendar_date.between(start_d, end_d))
@@ -291,7 +282,6 @@ def summary(
         if hrv_rec:
             hrv_status = hrv_rec.weekly_avg
             
-        # Stress query
         stress_q = session.query(Stress)
         if start_d and end_d:
             stress_q = stress_q.filter(Stress.calendar_date.between(start_d, end_d))
@@ -299,7 +289,6 @@ def summary(
         if stress_rec:
             stress_level = stress_rec.avg_stress_level
             
-        # Body Battery query
         battery_q = session.query(BodyBattery)
         if start_d and end_d:
             battery_q = battery_q.filter(BodyBattery.calendar_date.between(start_d, end_d))
@@ -307,7 +296,6 @@ def summary(
         if battery_rec:
             body_battery = battery_rec.charged
 
-        # UserProfile query for VO2 Max
         prof = session.query(UserProfile).filter_by(latest=True).first()
         if prof:
             vo2_max = prof.vo2_max_running or prof.vo2_max_cycling
@@ -474,7 +462,6 @@ def sync():
     import time
     now = time.time()
     
-    # Enforce minimum cooldown between manual syncs
     if now - _LAST_SYNC_TIME < _SYNC_COOLDOWN_SECONDS:
         remaining = int(_SYNC_COOLDOWN_SECONDS - (now - _LAST_SYNC_TIME))
         return JSONResponse({

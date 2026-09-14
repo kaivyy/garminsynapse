@@ -32,7 +32,6 @@ class DualAuthManager:
         except Exception as e:
             logger.warning(f"Primary curl_cffi login failed: {e}. Falling back to Playwright...")
 
-        # Fallback
         import asyncio
         try:
             loop = asyncio.get_running_loop()
@@ -83,12 +82,12 @@ class DualAuthManager:
             return tokens
 
         if auto_refresh:
-            # 1. Tier 1: Try ultra-fast direct OAuth refresh (~300ms)
+            # Direct OAuth refresh without full browser simulation.
             refreshed = self.fast_refresh()
             if refreshed and not self.token_manager.is_token_expired(refreshed):
                 return refreshed
 
-            # 2. Tier 2: Fallback to full auto-login with saved credentials if OAuth refresh failed
+            # Fallback to credential login if OAuth refresh fails.
             if self.token_manager.has_credentials():
                 logger.info("Tokens missing or expired, attempting auto-login fallback...")
                 new_tokens = self.auto_login()

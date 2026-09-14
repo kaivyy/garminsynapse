@@ -10,18 +10,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const syncBtn = document.getElementById('sync-btn');
     const closeActModal = document.getElementById('close-act-modal');
 
-    // Theme Toggle
     const themeToggle = document.getElementById('theme-toggle');
     const themeIconSun = document.getElementById('theme-icon-sun');
     const themeIconMoon = document.getElementById('theme-icon-moon');
 
-    // Date Filter Controls
     const startDateInput = document.getElementById('start-date-input');
     const endDateInput = document.getElementById('end-date-input');
     const applyDateFilter = document.getElementById('apply-date-filter');
     const presetBtns = document.querySelectorAll('.preset-btn');
 
-    // Health Card Elements
     const stepsVal = document.getElementById('steps-value');
     const stepsBar = document.getElementById('steps-bar');
     const hrVal = document.getElementById('hr-value');
@@ -35,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const activityTableBody = document.getElementById('activity-table-body');
     const activityCount = document.getElementById('activity-count');
 
-    // Modal elements
     const modalActName = document.getElementById('modal-act-name');
     const modalActType = document.getElementById('modal-act-type');
     const modalActTime = document.getElementById('modal-act-time');
@@ -48,9 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentStartDate = '';
     let currentEndDate = '';
 
-    // ============================================================
-    // Theme Toggle Logic
-    // ============================================================
     function getStoredTheme() {
         return localStorage.getItem('garminsynapse-theme') || 'dark';
     }
@@ -65,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
             themeIconMoon.classList.remove('hidden');
         }
     }
-    // Initialize theme
     setTheme(getStoredTheme());
 
     if (themeToggle) {
@@ -75,9 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ============================================================
-    // Helper
-    // ============================================================
     function formatDate(d) {
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -85,9 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${y}-${m}-${day}`;
     }
 
-    // ============================================================
-    // Auth Status Check
-    // ============================================================
     async function checkAuthStatus() {
         try {
             const res = await fetch('/api/v1/status');
@@ -170,25 +156,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
-    // ============================================================
-    // Activity Detail Modal
-    // ============================================================
     if (closeActModal) {
         closeActModal.addEventListener('click', () => {
             activityModal.classList.add('hidden');
         });
     }
-    // Close modal on backdrop click
     if (activityModal) {
         activityModal.addEventListener('click', (e) => {
             if (e.target === activityModal) activityModal.classList.add('hidden');
         });
     }
 
-    // ============================================================
-    // Date Range Presets
-    // ============================================================
     presetBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             presetBtns.forEach(b => b.classList.remove('active'));
@@ -231,9 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ============================================================
-    // Login Form
-    // ============================================================
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('email').value.trim();
@@ -268,9 +243,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ============================================================
-    // Logout
-    // ============================================================
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
             await fetch('/api/v1/auth/logout', { method: 'POST' });
@@ -278,9 +250,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ============================================================
-    // Dashboard Data Loader
-    // ============================================================
     async function loadDashboardData(startDate = '', endDate = '') {
         try {
             let summaryUrl = '/api/v1/summary';
@@ -295,7 +264,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 actUrl += `?${params.toString()}`;
             }
 
-            // Fetch Connected Device Info
             try {
                 const devRes = await fetch('/api/v1/devices');
                 if (devRes.ok) {
@@ -333,30 +301,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn('Could not load device info:', devErr);
             }
 
-            // Summary
             const summaryRes = await fetch(summaryUrl);
             if (summaryRes.ok) {
                 const summary = await summaryRes.json();
                 
-                // Steps
                 const stepsNum = summary.steps || 0;
                 stepsVal.textContent = stepsNum.toLocaleString();
                 const pct = Math.min(100, Math.round((stepsNum / 10000) * 100));
                 stepsBar.style.width = `${pct}%`;
 
-                // Resting HR
                 hrVal.innerHTML = summary.resting_hr ? `${summary.resting_hr} <span class="unit">bpm</span>` : `-- <span class="unit">bpm</span>`;
 
-                // Sleep Score
                 sleepScore.innerHTML = summary.sleep_score ? `${summary.sleep_score} <span class="unit">/ 100</span>` : `-- <span class="unit">/ 100</span>`;
 
-                // Body Battery
                 let finalBB = summary.body_battery;
-                // Stress Level
                 let finalStress = summary.stress_level;
                 let stressSuffix = '';
 
-                // Fetch Live Metrics for Today if DB is empty/partial
+                // Fetch live metrics for today if database records are empty.
                 if (!startDate || startDate === formatDate(new Date())) {
                     try {
                         const liveRes = await fetch('/api/v1/live');
@@ -393,16 +355,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 batteryVal.innerHTML = finalBB !== null && finalBB !== undefined ? `${finalBB} <span class="unit">%</span>` : `-- <span class="unit">%</span>`;
                 stressVal.innerHTML = finalStress !== null && finalStress !== undefined ? `${finalStress} <span class="unit">/ 100${stressSuffix}</span>` : `-- <span class="unit">/ 100</span>`;
 
-                // HRV
                 hrvVal.innerHTML = summary.hrv_status ? `${summary.hrv_status} <span class="unit">ms</span>` : `-- <span class="unit">ms</span>`;
 
-                // Respiration Rate
                 respVal.innerHTML = summary.respiration_rate ? `${summary.respiration_rate} <span class="unit">brpm</span>` : `-- <span class="unit">brpm</span>`;
 
-                // SpO2
                 spo2Val.innerHTML = summary.spo2 ? `${summary.spo2} <span class="unit">%</span>` : `-- <span class="unit">%</span>`;
 
-                // Training Readiness
                 try {
                     const readyRes = await fetch('/api/v1/readiness');
                     if (readyRes.ok) {
@@ -424,9 +382,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-
-
-            // Activities
             const actRes = await fetch(actUrl);
             if (actRes.ok) {
                 const activities = await actRes.json();
@@ -459,12 +414,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ============================================================
-    // Activity Detail Modal Opener
-    // ============================================================
     async function openActivityModal(act) {
         try {
-            // Populate basic info from row data
             modalActName.textContent = act.name || 'Workout Details';
             modalActType.textContent = act.type || 'Activity';
             modalActTime.textContent = act.start_ts || '--';
@@ -480,7 +431,6 @@ document.addEventListener('DOMContentLoaded', () => {
             splitsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading splits...</td></tr>';
             splitsContainer.style.display = 'block';
 
-            // Fetch splits data
             const res = await fetch(`/api/v1/activities/${act.id}/splits`);
             if (res.ok) {
                 const data = await res.json();
@@ -494,7 +444,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         const paceSec = Math.round((speed - paceMin) * 60).toString().padStart(2, '0');
                         const paceStr = speed > 0 ? `${paceMin}:${paceSec}` : '--';
                         
-                        // Format Time as MM:SS
                         let timeStr = '--';
                         if (split.duration) {
                             const tMin = Math.floor(split.duration / 60);
@@ -502,16 +451,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             timeStr = `${tMin}:${tSec}`;
                         }
                         
-                        // Format Dist as KM
                         const distStr = split.distance ? (split.distance / 1000).toFixed(2) : '--';
-
-                        // Elevation Gain
                         const elevStr = split.elevationGain !== undefined ? `+${split.elevationGain.toFixed(0)}m` : '--';
-                        
-                        // Cadence
                         const cadenceStr = split.averageRunCadence ? Math.round(split.averageRunCadence) : '--';
-                        
-                        // HR
                         const hrStr = split.averageHR ? `${Math.round(split.averageHR)}` : '--';
                         const hrMaxStr = split.maxHR ? ` <span style="color:var(--text-muted);font-size:0.8em">(${Math.round(split.maxHR)})</span>` : '';
 
@@ -537,9 +479,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ============================================================
-    // Manual Sync
-    // ============================================================
     if (syncBtn) {
         syncBtn.addEventListener('click', async () => {
             syncBtn.disabled = true;
@@ -556,8 +495,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ============================================================
-    // Init
-    // ============================================================
     checkAuthStatus();
 });

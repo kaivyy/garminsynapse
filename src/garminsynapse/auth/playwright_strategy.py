@@ -28,7 +28,6 @@ class PlaywrightAuthStrategy:
                 logger.info("Navigating to Garmin Connect login via Playwright...")
                 await page.goto("https://connect.garmin.com/signin")
                 
-                # Fill credentials if elements present
                 if await page.query_selector("input[type='email']"):
                     await page.fill("input[type='email']", email)
                     await page.fill("input[type='password']", password)

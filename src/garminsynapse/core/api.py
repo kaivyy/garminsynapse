@@ -180,10 +180,9 @@ class GarminAPI:
                     return {"splits": data["lapDTOs"]}
                 return {"splits": data} if isinstance(data, list) else {"splits": []}
             except Exception as e:
-                # Catch AttributeError or GarminConnectConnectionError (e.g. 404 if no splits exist)
+                # Handle activities without split data.
                 if "404" in str(e) or "204" in str(e):
                     return {"splits": []}
-                # Fall through to manual HTTP request
                 pass
                 
         url = f"{self.base_url}/activity-service/activity/{activity_id}/splits"
