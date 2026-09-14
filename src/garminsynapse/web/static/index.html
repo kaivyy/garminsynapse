@@ -510,12 +510,20 @@
                         <input type="email" id="email" required placeholder="your-email@garmin.com" class="input-field">
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="password-group">
                     <label for="password">Password</label>
                     <div class="input-wrap">
                         <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 16v2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
-                        <input type="password" id="password" required placeholder="••••••••••" class="input-field">
+                        <input type="password" id="password" placeholder="••••••••••" class="input-field">
                     </div>
+                </div>
+                <div class="form-group hidden" id="mfa-group">
+                    <label for="mfa-code">MFA Code</label>
+                    <div class="input-wrap">
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                        <input type="text" id="mfa-code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" class="input-field">
+                    </div>
+                    <p class="modal-subtext" id="mfa-hint">Enter the code sent to your device.</p>
                 </div>
                 <div id="login-error" class="error-msg hidden"></div>
                 <button type="submit" id="login-btn" class="btn primary-btn full-width">

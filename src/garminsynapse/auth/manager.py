@@ -32,6 +32,7 @@ class DualAuthManager:
         except Exception as e:
             logger.warning(f"Primary curl_cffi login failed: {e}. Falling back to Playwright...")
 
+        # Fallback
         import asyncio
         try:
             loop = asyncio.get_running_loop()
@@ -49,6 +50,52 @@ class DualAuthManager:
             return tokens
 
         raise RuntimeError("Authentication failed with all strategies (curl_cffi & Playwright).")
+
+    def login_start(self, email: str, password: str) -> Dict[str, Any]:
+        """Begin a non-blocking login. Returns {'needs_mfa': True, 'email': ...} when Garmin
+        requires an MFA code (call login_resume() with the code to finish), otherwise returns
+        full tokens (already persisted)."""
+        logger.info("Attempting primary 5-stage curl_cffi login (MFA-aware)...")
+        result = None
+        try:
+            result = self.cffi_auth.login_start(email, password)
+        except Exception as e:
+            logger.warning(f"Primary curl_cffi login failed: {e}. Falling back to Playwright...")
+
+        if result is not None:
+            if result.get("needs_mfa"):
+                return result
+            self.token_manager.save_tokens(result)
+            self.token_manager.save_credentials(email, password)
+            return result
+
+        # Playwright fallback (no MFA support today)
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                tokens = pool.submit(asyncio.run, self.playwright_auth.login_with_browser(email, password)).result()
+        else:
+            tokens = asyncio.run(self.playwright_auth.login_with_browser(email, password))
+        if tokens:
+            self.token_manager.save_tokens(tokens)
+            self.token_manager.save_credentials(email, password)
+            return tokens
+
+        raise RuntimeError("Authentication failed with all strategies (curl_cffi & Playwright).")
+
+    def login_resume(self, email: str, mfa_code: str) -> Dict[str, Any]:
+        """Complete a login previously paused by login_start() using the MFA code."""
+        tokens = self.cffi_auth.login_resume(email, mfa_code)
+        password = tokens.pop("_password", None)
+        self.token_manager.save_tokens(tokens)
+        if password:
+            self.token_manager.save_credentials(email, password)
+        return tokens
 
     def fast_refresh(self) -> Optional[Dict[str, Any]]:
         """Fast OAuth token refresh via diauth.garmin.com without browser SSO simulation (~300ms)."""
@@ -82,12 +129,12 @@ class DualAuthManager:
             return tokens
 
         if auto_refresh:
-            # Direct OAuth refresh without full browser simulation.
+            # 1. Tier 1: Try ultra-fast direct OAuth refresh (~300ms)
             refreshed = self.fast_refresh()
             if refreshed and not self.token_manager.is_token_expired(refreshed):
                 return refreshed
 
-            # Fallback to credential login if OAuth refresh fails.
+            # 2. Tier 2: Fallback to full auto-login with saved credentials if OAuth refresh failed
             if self.token_manager.has_credentials():
                 logger.info("Tokens missing or expired, attempting auto-login fallback...")
                 new_tokens = self.auto_login()
