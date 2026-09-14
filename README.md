@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/dashboard.png" alt="GarminSynapse Web Dashboard & Hardware Cockpit" width="100%">
+</p>
+
 <div align="center">
 
 # ⚡ GarminSynapse
@@ -10,13 +14,6 @@
 [![SQLite](https://img.shields.io/badge/SQLite-40%2B%20Tables-003B57.svg)](https://www.sqlite.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-
-<br/>
-<br/>
-
-<p align="center">
-  <img src="assets/dashboard.png" alt="GarminSynapse Web Dashboard & Hardware Cockpit" width="100%">
-</p>
 
 *Bridge your Garmin training data, health metrics, and raw `.FIT` files directly to AI Agents (Claude, Cursor, AGY) and modern web clients.*
 

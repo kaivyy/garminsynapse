@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Engineered Hardware Telemetry Cockpit** (`web/static/`):
   - Completely redesigned device section into a high-precision athletic hardware cockpit compliant with `antislop-ui` standards.
   - **High-Definition Smartwatch Graphic**: Multi-layered vector illustration of the Garmin Forerunner GPS smartwatch featuring brushed titanium bezel, 4 hex-screws, 5 ergonomic physical pushers (including signature athletic orange `START/STOP` ring), ribbed silicone straps, and an AMOLED watch face with active ECG pulse wave, step progress arc, and digital time.
-  - **4-Box Modular Telemetry Pods**: Monospace hardware identifiers for Serial Number (`8N9051741`), Unit ID (`3637876318`), Firmware (`v18.29` with `STABLE` badge), and Biometric Sensor Suite (`Elevate™ Gen 4`).
+  - **4-Box Modular Telemetry Pods**: Monospace hardware identifiers with click-to-reveal privacy masking for Serial Number (`8N90•••••`), Unit ID (`3637••••••`), Firmware (`v18.29` with `STABLE` badge), and Biometric Sensor Suite (`Elevate™ Gen 4`).
   - **HUD Telemetry Eyebrow & Capabilities Bar**: Top HUD banner with Garmin Delta emblem, SKU badge (`010-02970-42`), satellite constellation readout (`MULTI-GNSS`), and sensor capabilities strip (`Multi-Band GNSS`, `Wrist HR`, `Pulse Ox & VO2 Max`, `Body Battery™`, `NFC Pay`).
   - **Live Connection Cockpit**: Dedicated right-hand status panel with solid status dot, Garmin Connect link status, and data stream matrix (`FIT 2.0 Binary`, `OAuth / REST`).
 

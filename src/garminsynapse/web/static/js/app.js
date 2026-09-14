@@ -128,9 +128,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (dev) {
             const devName = dev.productDisplayName || dev.displayName || dev.deviceCategory || 'Garmin Watch';
-            if (modelElem) modelElem.textContent = devName;
-            if (snElem) snElem.textContent = dev.serialNumber || 'N/A';
-            if (unitIdElem) unitIdElem.textContent = dev.unitId ? String(dev.unitId) : 'N/A';
+            function maskIdentifier(val, prefixLen = 4) {
+                if (!val || val === 'N/A') return 'N/A';
+                const str = String(val);
+                if (str.length <= prefixLen) return '••••';
+                return str.substring(0, prefixLen) + '•'.repeat(Math.max(4, str.length - prefixLen));
+            }
+
+            const rawSn = dev.serialNumber || 'N/A';
+            const maskedSn = maskIdentifier(rawSn, 4);
+            if (snElem) {
+                snElem.textContent = maskedSn;
+                snElem.title = 'Click to reveal / hide serial number';
+                snElem.style.cursor = 'pointer';
+                snElem.onclick = () => {
+                    snElem.textContent = (snElem.textContent === maskedSn) ? rawSn : maskedSn;
+                };
+            }
+
+            const rawUnitId = dev.unitId ? String(dev.unitId) : 'N/A';
+            const maskedUnitId = maskIdentifier(rawUnitId, 4);
+            if (unitIdElem) {
+                unitIdElem.textContent = maskedUnitId;
+                unitIdElem.title = 'Click to reveal / hide unit ID';
+                unitIdElem.style.cursor = 'pointer';
+                unitIdElem.onclick = () => {
+                    unitIdElem.textContent = (unitIdElem.textContent === maskedUnitId) ? rawUnitId : maskedUnitId;
+                };
+            }
             if (fwElem) fwElem.textContent = dev.currentFirmwareVersion ? `v${dev.currentFirmwareVersion}` : 'N/A';
             if (skuElem && dev.actualProductSku) skuElem.textContent = `SKU ${dev.actualProductSku}`;
             if (sensorElem) sensorElem.textContent = 'Elevate™ Gen 4';
