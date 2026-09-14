@@ -30,12 +30,13 @@ def garmin_status() -> Dict[str, Any]:
 
 
 @mcp.tool()
-def garmin_login(email: str, password: str, mfa_code: str = "") -> Dict[str, Any]:
+def garmin_login(email: str, password: str = "", mfa_code: str = "") -> Dict[str, Any]:
     """Authenticate with Garmin Connect via 5-stage curl_cffi or Playwright fallback.
 
-    If the account has MFA enabled, call this first with just email+password: it will
+    If the account has MFA enabled, call this first with email+password: it will
     return {"status": "mfa_required"} instead of erroring. Call it again with the same
-    email and mfa_code set to the code sent to your device to complete the login.
+    email and mfa_code set to the code sent to your device to complete the login
+    (password is not required, and is ignored, on this resume call).
     """
     auth_mgr = DualAuthManager()
     if mfa_code:
@@ -44,6 +45,12 @@ def garmin_login(email: str, password: str, mfa_code: str = "") -> Dict[str, Any
             "status": "success",
             "message": "Authenticated successfully with Garmin Connect.",
             "source": tokens.get("source", "oauth")
+        }
+
+    if not password:
+        return {
+            "status": "error",
+            "message": "password is required to start a new login (only mfa_code is required to resume one)."
         }
 
     result = auth_mgr.login_start(email, password)

@@ -77,11 +77,18 @@ class CffiStrategy:
         garmin = Garmin(email=email, password=password, return_on_mfa=True, verify_login=False)
         if hasattr(garmin, "client"):
             garmin.client.skip_strategies = {"mobile+cffi", "mobile+requests"}
-        mfa_status, _ = garmin.login()
-        if mfa_status == "needs_mfa":
-            with _PENDING_LOCK:
-                _PENDING_LOGINS[email] = {"garmin": garmin, "password": password, "ts": time.time()}
-            return {"needs_mfa": True, "email": email}
+        # Garmin.login() returns None on an ordinary successful login; the
+        # (status, result) tuple is only returned when return_on_mfa causes
+        # it to short-circuit for an MFA challenge. Unpacking unconditionally
+        # would raise on every non-MFA login and incorrectly fall back to
+        # Playwright, so only inspect the tuple when one is actually returned.
+        login_result = garmin.login()
+        if login_result:
+            mfa_status, _ = login_result
+            if mfa_status == "needs_mfa":
+                with _PENDING_LOCK:
+                    _PENDING_LOGINS[email] = {"garmin": garmin, "password": password, "ts": time.time()}
+                return {"needs_mfa": True, "email": email}
         tokens = self._build_tokens(email, garmin)
         tokens["needs_mfa"] = False
         return tokens
@@ -89,14 +96,24 @@ class CffiStrategy:
     def login_resume(self, email: str, mfa_code: str) -> Dict[str, Any]:
         """Complete a login previously paused by login_start() using the MFA code."""
         with _PENDING_LOCK:
-            entry = _PENDING_LOGINS.pop(email, None)
+            entry = _PENDING_LOGINS.get(email)
+            if entry and time.time() - entry["ts"] > _MFA_PENDING_TTL_SECONDS:
+                # Expired: discard now so a stale entry can't be resumed, and
+                # report the same "not found" error a missing entry would.
+                del _PENDING_LOGINS[email]
+                entry = None
         if not entry:
             raise RuntimeError(
                 "No pending MFA login found for this email (it may have expired after "
                 f"{_MFA_PENDING_TTL_SECONDS}s). Please start the login again."
             )
         garmin = entry["garmin"]
+        # Keep the pending entry in place until the resume actually succeeds,
+        # so a mistyped/rejected code doesn't discard the live Garmin session
+        # and permanently prevent the user from retrying.
         garmin.client.resume_login(None, mfa_code)
+        with _PENDING_LOCK:
+            _PENDING_LOGINS.pop(email, None)
         tokens = self._build_tokens(email, garmin)
         # Transient only: carried back to the caller so it can persist saved
         # credentials for auto-login, then stripped before tokens hit disk.
