@@ -400,21 +400,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 respVal.innerHTML = summary.respiration_rate ? `${summary.respiration_rate} <span class="unit">brpm</span>` : `-- <span class="unit">brpm</span>`;
 
-                spo2Val.innerHTML = summary.spo2 ? `${summary.spo2} <span class="unit">%</span>` : `-- <span class="unit">%</span>`;
+                const spo2Sub = document.getElementById('spo2-subtext');
+                if (summary.spo2) {
+                    spo2Val.innerHTML = `${summary.spo2} <span class="unit">%</span>`;
+                    if (spo2Sub) spo2Sub.textContent = 'Blood Oxygen Saturation';
+                } else {
+                    spo2Val.innerHTML = `-- <span class="unit">%</span>`;
+                    if (spo2Sub) spo2Sub.textContent = 'Sensor Off in Watch Settings';
+                }
 
                 try {
-                    const readyRes = await fetch('/api/v1/readiness');
+                    const readyUrl = (startDate && endDate && startDate === endDate)
+                        ? `/api/v1/readiness?date=${startDate}`
+                        : (endDate ? `/api/v1/readiness?date=${endDate}` : '/api/v1/readiness');
+                    const readyRes = await fetch(readyUrl);
                     if (readyRes.ok) {
                         const readyData = await readyRes.json();
                         const readyVal = document.getElementById('readiness-value');
                         const readySub = document.getElementById('readiness-subtext');
-                        if (readyData.status === 'success' && readyData.data) {
-                            const score = readyData.data.score || readyData.data.trainingReadiness || readyData.data.overallScore;
+                        if (readyData.status === 'success') {
+                            const score = (readyData.score !== undefined && readyData.score !== null)
+                                ? readyData.score
+                                : (readyData.data ? (Array.isArray(readyData.data) ? readyData.data[0]?.score : readyData.data.score) : null);
                             if (score !== undefined && score !== null && readyVal) {
                                 readyVal.innerHTML = `${score} <span class="unit">/ 100</span>`;
                             }
-                            if (readyData.data.feedback && readySub) {
-                                readySub.textContent = readyData.data.feedback;
+                            const feedback = readyData.feedback || (readyData.data ? (Array.isArray(readyData.data) ? readyData.data[0]?.feedbackShort : readyData.data.feedbackShort) : null);
+                            if (feedback && readySub) {
+                                readySub.textContent = String(feedback).replace(/_/g, ' ');
                             }
                         }
                     }

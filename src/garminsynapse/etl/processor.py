@@ -184,6 +184,7 @@ class GarminProcessor:
                 min_hr = data.get("minHeartRate")
                 max_hr = data.get("maxHeartRate")
                 cals = data.get("totalKilocalories")
+                spo2_val = data.get("averageSpo2") or data.get("averageSpO2")
 
                 if existing:
                     if steps is not None: existing.steps = steps
@@ -193,6 +194,7 @@ class GarminProcessor:
                     if min_hr is not None: existing.min_hr = min_hr
                     if max_hr is not None: existing.max_hr = max_hr
                     if cals is not None: existing.total_calories = cals
+                    if spo2_val is not None: existing.avg_spo2 = spo2_val
                 else:
                     session.add(DailySummary(
                         user_id=user_id,
@@ -203,8 +205,33 @@ class GarminProcessor:
                         resting_hr=rhr,
                         min_hr=min_hr,
                         max_hr=max_hr,
-                        total_calories=cals
+                        total_calories=cals,
+                        avg_spo2=spo2_val
                     ))
+
+                # Also populate Stress and BodyBattery from _STATS if available
+                avg_stress = data.get("averageStressLevel") or data.get("avgStressLevel")
+                max_stress = data.get("maxStressLevel")
+                if avg_stress is not None or max_stress is not None:
+                    existing_stress = session.query(Stress).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                    if existing_stress:
+                        if avg_stress is not None: existing_stress.avg_stress_level = avg_stress
+                        if max_stress is not None: existing_stress.max_stress_level = max_stress
+                    else:
+                        session.add(Stress(user_id=user_id, calendar_date=parsed_date,
+                            avg_stress_level=avg_stress, max_stress_level=max_stress))
+
+                bb_charged = data.get("bodyBatteryChargedValue")
+                bb_drained = data.get("bodyBatteryDrainedValue")
+                if bb_charged is not None or bb_drained is not None:
+                    existing_bb = session.query(BodyBattery).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                    if existing_bb:
+                        if bb_charged is not None: existing_bb.charged = bb_charged
+                        if bb_drained is not None: existing_bb.drained = bb_drained
+                    else:
+                        session.add(BodyBattery(user_id=user_id, calendar_date=parsed_date,
+                            charged=bb_charged, drained=bb_drained))
+
                 session.commit()
                 logger.info(f"Processed DailySummary record for {parsed_date}")
 
@@ -241,16 +268,18 @@ class GarminProcessor:
             elif "_STRESS" in json_path.name and isinstance(data, dict):
                 user_id = self._extract_user_id(session, data)
                 self._ensure_user_exists(session, user_id)
-                cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
+                cal_str = cal_date_str or data.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
                 parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
                 existing = session.query(Stress).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                avg_stress = data.get("avgStressLevel") or data.get("averageStressLevel") or data.get("overallStressLevel")
+                max_stress = data.get("maxStressLevel")
                 if existing:
-                    existing.avg_stress_level = data.get("overallStressLevel")
-                    existing.max_stress_level = data.get("maxStressLevel")
+                    if avg_stress is not None: existing.avg_stress_level = avg_stress
+                    if max_stress is not None: existing.max_stress_level = max_stress
                 else:
                     session.add(Stress(user_id=user_id, calendar_date=parsed_date,
-                        avg_stress_level=data.get("overallStressLevel"),
-                        max_stress_level=data.get("maxStressLevel")))
+                        avg_stress_level=avg_stress,
+                        max_stress_level=max_stress))
                 session.commit()
 
             elif "_HRV" in json_path.name and isinstance(data, dict):
@@ -272,20 +301,23 @@ class GarminProcessor:
                         weekly_avg=weekly, last_night_avg=nightly, status=status_str))
                 session.commit()
 
-            elif "_HEART_RATE" in json_path.name and isinstance(data, dict):
-                user_id = self._extract_user_id(session, data)
-                self._ensure_user_exists(session, user_id)
-                cal_str = cal_date_str or datetime.utcnow().strftime("%Y-%m-%d")
-                parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
-                existing = session.query(BodyBattery).filter_by(user_id=user_id, calendar_date=parsed_date).first()
-                charged_val = data.get("bodyBatteryChargedValue")
-                drained_val = data.get("bodyBatteryDrainedValue")
-                if existing:
-                    existing.charged = charged_val
-                    existing.drained = drained_val
-                else:
-                    session.add(BodyBattery(user_id=user_id, calendar_date=parsed_date,
-                        charged=charged_val, drained=drained_val))
+            elif "_BODY_BATTERY" in json_path.name:
+                items = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
+                for item in items:
+                    if not isinstance(item, dict): continue
+                    cal_str = cal_date_str or item.get("date") or item.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
+                    parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
+                    user_id = self._extract_user_id(session, item)
+                    self._ensure_user_exists(session, user_id)
+                    charged_val = item.get("charged")
+                    drained_val = item.get("drained")
+                    existing = session.query(BodyBattery).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                    if existing:
+                        if charged_val is not None: existing.charged = charged_val
+                        if drained_val is not None: existing.drained = drained_val
+                    else:
+                        session.add(BodyBattery(user_id=user_id, calendar_date=parsed_date,
+                            charged=charged_val, drained=drained_val))
                 session.commit()
         except Exception as e:
             session.rollback()

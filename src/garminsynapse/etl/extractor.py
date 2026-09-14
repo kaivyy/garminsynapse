@@ -45,6 +45,7 @@ class GarminExtractor:
             self._save_endpoint_json(api, "get_sleep_data", date_str, f"{date_str}_SLEEP.json")
             self._save_endpoint_json(api, "get_daily_stats", date_str, f"{date_str}_STATS.json")
             self._save_endpoint_json(api, "get_stress_data", date_str, f"{date_str}_STRESS.json")
+            self._save_endpoint_json(api, "get_body_battery", date_str, f"{date_str}_BODY_BATTERY.json")
             self._save_endpoint_json(api, "get_hrv_data", date_str, f"{date_str}_HRV.json")
             self._save_endpoint_json(api, "get_heart_rates", date_str, f"{date_str}_HEART_RATE.json")
             self._save_endpoint_json(api, "get_respiration_data", date_str, f"{date_str}_RESPIRATION.json")

@@ -289,6 +289,17 @@ def summary(
         all_battery = battery_q.order_by(BodyBattery.calendar_date.desc()).all()
         battery_rec = all_battery[0] if all_battery else None
 
+        # If single-day requested is today and there is no record for today yet,
+        # fallback to the most recent day that has data.
+        today_d = datetime.now().date()
+        is_today = (start_d == today_d and end_d == today_d) or (start_d == today_d and not end_d)
+        if not is_range and is_today and not daily_rec and not sleep_rec and not stress_rec:
+            daily_rec = session.query(DailySummary).order_by(DailySummary.calendar_date.desc()).first()
+            sleep_rec = session.query(Sleep).order_by(Sleep.calendar_date.desc()).first()
+            hrv_rec = session.query(HRV).order_by(HRV.calendar_date.desc()).first()
+            stress_rec = session.query(Stress).filter(Stress.avg_stress_level.isnot(None)).order_by(Stress.calendar_date.desc()).first()
+            battery_rec = session.query(BodyBattery).filter(BodyBattery.charged.isnot(None)).order_by(BodyBattery.calendar_date.desc()).first()
+
         prof = session.query(UserProfile).filter_by(latest=True).first()
         if prof:
             vo2_max = prof.vo2_max_running or prof.vo2_max_cycling
@@ -373,19 +384,79 @@ def summary(
 
 
 @router.get("/readiness")
-def training_readiness(date_str: Optional[str] = None):
+def training_readiness(date_str: Optional[str] = None, date: Optional[str] = None):
     """Fetch Training Readiness score and recovery factor breakdown."""
-    api = GarminAPI()
-    if not api._garmin_instance:
-        return JSONResponse({"status": "error", "message": "Not authenticated with Garmin"})
-    d = date_str or datetime.now().strftime("%Y-%m-%d")
-    try:
-        if hasattr(api._garmin_instance, "get_training_readiness"):
-            res = api._garmin_instance.get_training_readiness(d)
-            return JSONResponse({"status": "success", "date": d, "data": res})
-        return JSONResponse({"status": "unavailable", "message": "Device not readiness capable"})
-    except Exception as e:
-        return JSONResponse({"status": "error", "message": str(e)})
+    import json
+    from pathlib import Path
+    target_d = date or date_str or datetime.now().strftime("%Y-%m-%d")
+    ingest_dir = Path.home() / "garminsynapse" / "garmin_files" / "ingest"
+    if not ingest_dir.exists():
+        ingest_dir = Path("/root/garminsynapse/garmin_files/ingest")
+    
+    data_item = None
+    # 1. Try local ingest file first
+    ingest_file = ingest_dir / f"{target_d}_READINESS.json"
+    if ingest_file.exists():
+        try:
+            with open(ingest_file, "r", encoding="utf-8") as f:
+                content = json.load(f)
+                if isinstance(content, list) and content:
+                    data_item = content[0]
+                elif isinstance(content, dict):
+                    data_item = content
+        except Exception:
+            pass
+
+    # 2. Try Garmin API
+    if not data_item:
+        api = GarminAPI()
+        if api._garmin_instance and hasattr(api._garmin_instance, "get_training_readiness"):
+            try:
+                res = api._garmin_instance.get_training_readiness(target_d)
+                if isinstance(res, list) and res:
+                    data_item = res[0]
+                elif isinstance(res, dict):
+                    data_item = res
+                
+                # If target was today and empty, fallback to yesterday
+                if not data_item and not (date or date_str):
+                    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+                    res = api._garmin_instance.get_training_readiness(yesterday)
+                    if isinstance(res, list) and res:
+                        data_item = res[0]
+                        target_d = yesterday
+            except Exception as e:
+                logger.debug(f"Error calling live get_training_readiness: {e}")
+
+    # 3. If still not found, search newest _READINESS.json
+    if not data_item and ingest_dir.exists():
+        readiness_files = sorted(ingest_dir.glob("*_READINESS.json"), reverse=True)
+        for rf in readiness_files:
+            try:
+                with open(rf, "r", encoding="utf-8") as f:
+                    content = json.load(f)
+                    if isinstance(content, list) and content and content[0].get("score") is not None:
+                        data_item = content[0]
+                        target_d = rf.stem.split("_")[0]
+                        break
+            except Exception:
+                continue
+
+    if data_item:
+        score = data_item.get("score") or data_item.get("trainingReadiness")
+        level = data_item.get("level") or ""
+        feedback = data_item.get("feedbackShort") or data_item.get("feedbackLong") or level
+        clean_feedback = feedback.replace("_", " ").title() if feedback else "Optimal Recovery"
+        return JSONResponse({
+            "status": "success",
+            "date": target_d,
+            "score": score,
+            "level": level,
+            "feedback": clean_feedback,
+            "data": data_item
+        })
+
+    return JSONResponse({"status": "unavailable", "message": "No readiness data available", "score": None})
 
 
 @router.get("/predictions")
