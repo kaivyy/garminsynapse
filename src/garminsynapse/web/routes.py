@@ -2,7 +2,7 @@
 import logging
 from datetime import datetime, date
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -17,6 +17,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _run_background_sync(days: int = 7):
+    """Run extraction and ETL processing in background so login returns immediately."""
+    try:
+        extractor = GarminExtractor()
+        extractor.extract_all(days=days)
+        GarminProcessor().process_ingest_directory()
+        logger.info(f"Background sync for {days} days completed successfully.")
+    except Exception as sync_err:
+        logger.warning(f"Background sync warning: {sync_err}")
+
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -24,9 +35,9 @@ class LoginRequest(BaseModel):
 
 @router.get("/status")
 def status():
-    """System health & Auth status."""
+    """System health & Auth status with seamless auto-refresh if expired."""
     auth_mgr = DualAuthManager()
-    tokens = auth_mgr.get_active_tokens()
+    tokens = auth_mgr.get_active_tokens(auto_refresh=True)
     return JSONResponse({
         "status": "OK",
         "authenticated": tokens is not None,
@@ -36,19 +47,13 @@ def status():
 
 
 @router.post("/auth/login")
-def login(req: LoginRequest):
-    """Authenticate with Garmin Connect and trigger real data extraction."""
+def login(req: LoginRequest, background_tasks: BackgroundTasks):
+    """Authenticate with Garmin Connect quickly and trigger data extraction in the background."""
     auth_mgr = DualAuthManager()
     try:
         tokens = auth_mgr.login(req.email, req.password)
-        
-        # Trigger background data sync upon successful login
-        try:
-            extractor = GarminExtractor()
-            extractor.extract_all(days=7)
-            GarminProcessor().process_ingest_directory()
-        except Exception as sync_err:
-            logger.warning(f"Initial post-login sync warning: {sync_err}")
+        # Schedule extraction in background to avoid blocking the HTTP response
+        background_tasks.add_task(_run_background_sync, 7)
 
         return JSONResponse({
             "status": "success",
@@ -238,7 +243,7 @@ def summary(
 ):
     """Complete health and training metrics summary with optional custom date range filtering."""
     auth_mgr = DualAuthManager()
-    if not auth_mgr.get_active_tokens():
+    if not auth_mgr.get_active_tokens(auto_refresh=True):
         return JSONResponse({"error": "unauthenticated"}, status_code=401)
 
     db = DatabaseManager()
@@ -395,7 +400,7 @@ def activities(
 ):
     """List activities from SQLite database with optional custom date range filtering."""
     auth_mgr = DualAuthManager()
-    if not auth_mgr.get_active_tokens():
+    if not auth_mgr.get_active_tokens(auto_refresh=True):
         return JSONResponse({"error": "unauthenticated"}, status_code=401)
 
     db = DatabaseManager()
@@ -436,7 +441,7 @@ def activities(
 def activity_details(activity_id: int):
     """Fetch details of a single activity."""
     auth_mgr = DualAuthManager()
-    if not auth_mgr.get_active_tokens():
+    if not auth_mgr.get_active_tokens(auto_refresh=True):
         return JSONResponse({"error": "unauthenticated"}, status_code=401)
 
     db = DatabaseManager()
@@ -478,7 +483,7 @@ def sync():
         })
 
     auth_mgr = DualAuthManager()
-    if not auth_mgr.get_active_tokens():
+    if not auth_mgr.get_active_tokens(auto_refresh=True):
         return JSONResponse({"error": "unauthenticated"}, status_code=401)
 
     try:
@@ -497,9 +502,8 @@ def sync():
 def get_activity_splits_route(activity_id: int):
     """Get per-km or per-lap splits for a specific activity."""
     auth_mgr = DualAuthManager()
-    tokens = auth_mgr.get_active_tokens()
+    tokens = auth_mgr.get_active_tokens(auto_refresh=True)
     if not tokens:
-        from fastapi.responses import JSONResponse
         return JSONResponse({"error": "unauthenticated"}, status_code=401)
     
     headers = tokens.get("headers", {})

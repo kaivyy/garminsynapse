@@ -15,9 +15,16 @@ class CffiStrategy:
     def login(self, email: str, password: str, prompt_mfa=None) -> Dict[str, Any]:
         logger.info(f"Authenticating Garmin Connect for {email}...")
         garmin = Garmin(email=email, password=password, prompt_mfa=prompt_mfa)
+        if hasattr(garmin, "client"):
+            garmin.client.skip_strategies = {"mobile+cffi", "mobile+requests"}
         garmin.login()
         client_obj = getattr(garmin, "client", None)
-        headers = dict(client_obj.session.headers) if (client_obj and hasattr(client_obj, "session")) else {}
+        if client_obj and hasattr(client_obj, "get_api_headers"):
+            headers = client_obj.get_api_headers()
+        elif client_obj and hasattr(client_obj, "session"):
+            headers = dict(client_obj.session.headers)
+        else:
+            headers = {}
         
         client_dump = None
         if client_obj and hasattr(client_obj, "dumps"):

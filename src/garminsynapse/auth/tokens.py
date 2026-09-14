@@ -74,3 +74,39 @@ class TokenManager:
         except Exception as e:
             logger.error(f"Failed to load credentials: {e}")
             return None
+
+    def has_credentials(self) -> bool:
+        """Check if auto-login credentials exist and are non-empty."""
+        return self.cred_file.exists() and self.cred_file.stat().st_size > 0
+
+    def delete_credentials(self) -> None:
+        """Remove saved credentials file (e.g. on explicit logout)."""
+        if self.cred_file.exists():
+            self.cred_file.unlink()
+            logger.info(f"Deleted credentials file {self.cred_file}")
+
+    def is_token_expired(self, tokens: Optional[Dict[str, Any]] = None) -> bool:
+        """Inspect the JWT expiration inside client_state to determine validity."""
+        import time
+        tok = tokens if tokens is not None else self.load_tokens()
+        if not tok:
+            return True
+        client_state_raw = tok.get("client_state")
+        if not client_state_raw:
+            return True
+        try:
+            cs = json.loads(client_state_raw)
+            token = cs.get("di_token")
+            if not token:
+                return True
+            parts = token.split(".")
+            if len(parts) >= 2:
+                payload_b64 = parts[1] + "=" * (-len(parts[1]) % 4)
+                payload = json.loads(base64.urlsafe_b64decode(payload_b64.encode()).decode())
+                exp = payload.get("exp")
+                if exp and time.time() > (int(exp) - 300):
+                    return True
+            return False
+        except Exception as e:
+            logger.debug(f"Error checking token expiration: {e}")
+            return True

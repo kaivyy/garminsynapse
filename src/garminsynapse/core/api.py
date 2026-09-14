@@ -16,12 +16,32 @@ logger = logging.getLogger(__name__)
 
 
 def with_auto_retry(func):
-    """Decorator to retry requests on 5xx or network errors."""
+    """Decorator to retry requests on 5xx, 401, or network errors with auto-login."""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception as e:
+            err_str = str(e)
+            if "401" in err_str or "403" in err_str or "unauthenticated" in err_str.lower():
+                logger.info(f"API call {func.__name__} encountered auth error: {e}. Attempting auto-login and retry...")
+                from garminsynapse.auth.manager import DualAuthManager
+                auth_mgr = DualAuthManager()
+                new_tokens = auth_mgr.auto_login()
+                if new_tokens:
+                    if args and isinstance(args[0], GarminAPI):
+                        api_inst = args[0]
+                        if new_tokens.get("client_state") and _GARMINCONNECT_AVAILABLE:
+                            try:
+                                g = garminconnect.Garmin()
+                                g.client.loads(new_tokens["client_state"])
+                                g.display_name = new_tokens.get("user_id")
+                                api_inst._garmin_instance = g
+                                if hasattr(g.client, "get_api_headers"):
+                                    api_inst.session.headers.update(g.client.get_api_headers())
+                            except Exception as reload_err:
+                                logger.warning(f"Failed to reload client after auto-login: {reload_err}")
+                    return func(*args, **kwargs)
             logger.warning(f"API call {func.__name__} failed: {e}. Retrying...")
             return func(*args, **kwargs)
     return wrapper
@@ -38,8 +58,9 @@ class GarminAPI:
         self._garmin_instance = None
 
         if _GARMINCONNECT_AVAILABLE:
-            token_mgr = TokenManager()
-            cached = token_mgr.load_tokens() or {}
+            from garminsynapse.auth.manager import DualAuthManager
+            auth_mgr = DualAuthManager()
+            cached = auth_mgr.get_active_tokens(auto_refresh=True) or {}
             headers = session_headers or cached.get("headers")
             target_email = email or cached.get("email")
             client_state = cached.get("client_state")
@@ -48,44 +69,25 @@ class GarminAPI:
                 try:
                     g = garminconnect.Garmin()
                     g.client.loads(client_state)
+                    # Restore display_name immediately from cached user_id without extra HTTP roundtrips
+                    g.display_name = cached.get("user_id")
                     self._garmin_instance = g
-                    if hasattr(g, "client") and hasattr(g.client, "session"):
+                    if hasattr(g, "client") and hasattr(g.client, "get_api_headers"):
+                        self.session.headers.update(g.client.get_api_headers())
+                    elif hasattr(g, "client") and hasattr(g.client, "session"):
                         self.session = g.client.session
-
-                    # Restore display_name after session restore.
-                    # client.loads() only restores HTTP session cookies/tokens
-                    # but does NOT call login(), so display_name stays None.
-                    # Many endpoints (sleep, heart_rates, user_summary) embed
-                    # display_name in the URL path and fail with 403 without it.
-                    if not g.display_name:
-                        try:
-                            prof = g.client.connectapi("/userprofile-service/socialProfile")
-                            if isinstance(prof, dict):
-                                g.display_name = prof.get("displayName")
-                                g.full_name = prof.get("fullName", "")
-                        except Exception as profile_err:
-                            # Fallback: use cached user_id from tokens
-                            g.display_name = cached.get("user_id")
-                            logger.warning(f"Could not fetch socialProfile for display_name, using cached value: {profile_err}")
-                            if "401" in str(profile_err) or "403" in str(profile_err):
-                                logger.info("Token appears expired, attempting auto-login...")
-                                from garminsynapse.auth.manager import DualAuthManager
-                                auth_mgr = DualAuthManager()
-                                new_tokens = auth_mgr.auto_login()
-                                if new_tokens and "client_state" in new_tokens:
-                                    g.client.loads(new_tokens["client_state"])
-                                    if hasattr(g, "client") and hasattr(g.client, "session"):
-                                        self.session = g.client.session
-                                    logger.info("Auto-login successful, session restored.")
-
                 except Exception as e:
                     logger.warning(f"Could not restore logged in Garmin instance from client_state: {e}")
             elif target_email and password:
                 try:
                     g = garminconnect.Garmin(email=target_email, password=password)
+                    if hasattr(g, "client"):
+                        g.client.skip_strategies = {"mobile+cffi", "mobile+requests"}
                     g.login()
                     self._garmin_instance = g
-                    if hasattr(g, "client") and hasattr(g.client, "session"):
+                    if hasattr(g, "client") and hasattr(g.client, "get_api_headers"):
+                        self.session.headers.update(g.client.get_api_headers())
+                    elif hasattr(g, "client") and hasattr(g.client, "session"):
                         self.session = g.client.session
                 except Exception as e:
                     logger.warning(f"Could not initialize logged in Garmin instance: {e}")
