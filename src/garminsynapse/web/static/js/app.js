@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showDashboard() {
         loginModal.classList.add('hidden');
         dashboardContainer.classList.remove('hidden');
-        loadDeviceInfo();
+        loadDeviceInfo(true);
     }
 
     function renderDeviceCard(devData) {
@@ -116,6 +116,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const badgeElem = document.getElementById('device-status-badge');
         const statusTextElem = document.getElementById('device-status-text');
         const statusSubtextElem = document.getElementById('device-status-subtext');
+        const watchSvgElem = document.getElementById('device-watch-svg');
+        const caseTagElem = document.getElementById('device-case-tag');
 
         if (!devData) return;
 
@@ -129,7 +131,9 @@ document.addEventListener('DOMContentLoaded', () => {
             dev = devicesList.find(d => String(d.unitId) === String(primaryDeviceId)) || null;
         }
         if (!dev && devicesList.length > 0) {
-            dev = devicesList.find(d => d.primaryTrainingCapable || d.primaryActivityTrackerIndicator || d.isPrimaryUser) || devicesList[0];
+            dev = devicesList.find(d => d.primaryTrainingCapable || d.isPrimaryUser) ||
+                  devicesList.find(d => d.primaryActivityTrackerIndicator) ||
+                  devicesList[0];
         }
         if (!dev && devData.primary && devData.primary.RegisteredDevices && devData.primary.RegisteredDevices.length > 0) {
             dev = devData.primary.RegisteredDevices[0];
@@ -138,6 +142,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dev) {
             const devName = dev.productDisplayName || dev.displayName || dev.deviceCategory || 'Garmin Watch';
             if (modelElem) modelElem.textContent = devName;
+            // The device schematic is a generic illustration, not a real render
+            // of the account's actual watch -- label it with the resolved
+            // model instead of a hardcoded model name so assistive tech isn't
+            // told the wrong device.
+            if (watchSvgElem) watchSvgElem.setAttribute('aria-label', `${devName} illustration`);
+            // No case-size field is exposed by the Garmin devices API, so this
+            // stays hidden rather than showing a fabricated spec.
+            if (caseTagElem) caseTagElem.style.display = 'none';
             function maskIdentifier(val, prefixLen = 4) {
                 if (!val || val === 'N/A') return 'N/A';
                 const str = String(val);
@@ -182,6 +194,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (statusSubtextElem) statusSubtextElem.textContent = 'Garmin Connect Active';
         } else {
             if (modelElem) modelElem.textContent = 'No Garmin Device Found';
+            if (watchSvgElem) watchSvgElem.setAttribute('aria-label', 'Garmin watch illustration');
+            if (caseTagElem) caseTagElem.style.display = 'none';
             if (snElem) snElem.textContent = '--';
             if (unitIdElem) unitIdElem.textContent = '--';
             if (fwElem) fwElem.textContent = '--';
@@ -196,9 +210,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function loadDeviceInfo() {
+    async function loadDeviceInfo(forceRefresh = false) {
         try {
-            const devRes = await fetch('/api/v1/devices');
+            // The /api/v1/devices response is cached server-side for up to 6
+            // hours to protect the Garmin API from repeated hits. Force a
+            // fresh fetch on login and right after a manual sync -- the two
+            // points where a newly-registered/retired device is most likely
+            // to have changed -- so a stale cache can't keep showing the
+            // wrong model for hours in the meantime.
+            const url = forceRefresh ? '/api/v1/devices?force=true' : '/api/v1/devices';
+            const devRes = await fetch(url);
             if (devRes.ok) {
                 const devData = await devRes.json();
                 renderDeviceCard(devData);
@@ -302,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function loadDashboardData(startDate = '', endDate = '') {
+    async function loadDashboardData(startDate = '', endDate = '', forceDeviceRefresh = false) {
         try {
             let summaryUrl = '/api/v1/summary';
             let actUrl = '/api/v1/activities';
@@ -316,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 actUrl += `?${params.toString()}`;
             }
 
-            await loadDeviceInfo();
+            await loadDeviceInfo(forceDeviceRefresh);
 
             const summaryRes = await fetch(summaryUrl);
             if (summaryRes.ok) {
@@ -570,7 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
             syncBtn.querySelector('span').textContent = 'Syncing...';
             try {
                 await fetch('/api/v1/sync', { method: 'POST' });
-                await loadDashboardData(currentStartDate, currentEndDate);
+                await loadDashboardData(currentStartDate, currentEndDate, true);
             } catch (err) {
                 console.error('Sync failed:', err);
             } finally {
