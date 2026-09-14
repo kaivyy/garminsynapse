@@ -14,7 +14,7 @@ class CffiStrategy:
 
     def login(self, email: str, password: str, prompt_mfa=None) -> Dict[str, Any]:
         logger.info(f"Authenticating Garmin Connect for {email}...")
-        garmin = Garmin(email=email, password=password, prompt_mfa=prompt_mfa)
+        garmin = Garmin(email=email, password=password, prompt_mfa=prompt_mfa, verify_login=False)
         if hasattr(garmin, "client"):
             garmin.client.skip_strategies = {"mobile+cffi", "mobile+requests"}
         garmin.login()

@@ -24,10 +24,10 @@ def with_auto_retry(func):
         except Exception as e:
             err_str = str(e)
             if "401" in err_str or "403" in err_str or "unauthenticated" in err_str.lower():
-                logger.info(f"API call {func.__name__} encountered auth error: {e}. Attempting auto-login and retry...")
+                logger.info(f"API call {func.__name__} encountered auth error: {e}. Attempting fast token refresh and retry...")
                 from garminsynapse.auth.manager import DualAuthManager
                 auth_mgr = DualAuthManager()
-                new_tokens = auth_mgr.auto_login()
+                new_tokens = auth_mgr.fast_refresh() or auth_mgr.auto_login()
                 if new_tokens:
                     if args and isinstance(args[0], GarminAPI):
                         api_inst = args[0]
@@ -40,7 +40,7 @@ def with_auto_retry(func):
                                 if hasattr(g.client, "get_api_headers"):
                                     api_inst.session.headers.update(g.client.get_api_headers())
                             except Exception as reload_err:
-                                logger.warning(f"Failed to reload client after auto-login: {reload_err}")
+                                logger.warning(f"Failed to reload client after token refresh: {reload_err}")
                     return func(*args, **kwargs)
             logger.warning(f"API call {func.__name__} failed: {e}. Retrying...")
             return func(*args, **kwargs)

@@ -51,18 +51,49 @@ class DualAuthManager:
 
         raise RuntimeError("Authentication failed with all strategies (curl_cffi & Playwright).")
 
+    def fast_refresh(self) -> Optional[Dict[str, Any]]:
+        """Fast OAuth token refresh via diauth.garmin.com without browser SSO simulation (~300ms)."""
+        with _login_lock:
+            tokens = self.token_manager.load_tokens()
+            if not tokens or not tokens.get("client_state"):
+                return None
+            try:
+                import garminconnect
+                g = garminconnect.Garmin()
+                g.client.loads(tokens["client_state"])
+                if not getattr(g.client, "di_refresh_token", None):
+                    return None
+                logger.info("Performing fast OAuth DI token refresh (~300ms)...")
+                g.client._refresh_di_token()
+                new_dump = g.client.dumps()
+                headers = g.client.get_api_headers() if hasattr(g.client, "get_api_headers") else {}
+                tokens["client_state"] = new_dump
+                tokens["headers"] = headers
+                self.token_manager.save_tokens(tokens)
+                logger.info("Fast OAuth token refresh succeeded (~300ms).")
+                return tokens
+            except Exception as e:
+                logger.warning(f"Fast OAuth token refresh failed: {e}")
+                return None
+
     def get_active_tokens(self, auto_refresh: bool = True) -> Optional[Dict[str, Any]]:
-        """Load active tokens from disk, auto-refreshing if expired and credentials are saved."""
+        """Load active tokens from disk, auto-refreshing if expired via fast OAuth (<500ms) or auto-login."""
         tokens = self.token_manager.load_tokens()
         if tokens and not self.token_manager.is_token_expired(tokens):
             return tokens
 
-        # If expired or missing, auto-login if credentials exist
-        if auto_refresh and self.token_manager.has_credentials():
-            logger.info("Tokens missing or expired, attempting auto-login...")
-            new_tokens = self.auto_login()
-            if new_tokens:
-                return new_tokens
+        if auto_refresh:
+            # 1. Tier 1: Try ultra-fast direct OAuth refresh (~300ms)
+            refreshed = self.fast_refresh()
+            if refreshed and not self.token_manager.is_token_expired(refreshed):
+                return refreshed
+
+            # 2. Tier 2: Fallback to full auto-login with saved credentials if OAuth refresh failed
+            if self.token_manager.has_credentials():
+                logger.info("Tokens missing or expired, attempting auto-login fallback...")
+                new_tokens = self.auto_login()
+                if new_tokens:
+                    return new_tokens
 
         return tokens
 
