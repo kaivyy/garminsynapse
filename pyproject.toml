@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "garminsynapse"
-version = "0.4.1"
+version = "0.4.2"
 description = "Garmin Synapse — Unified Garmin Connect engine, MCP server, and health dashboard."
 requires-python = ">=3.9"
 dependencies = [
