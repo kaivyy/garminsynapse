@@ -30,7 +30,8 @@ def _run_background_sync(days: int = 7):
 
 class LoginRequest(BaseModel):
     email: str
-    password: str
+    password: Optional[str] = None
+    mfa_code: Optional[str] = None
 
 
 @router.get("/status")
@@ -48,10 +49,29 @@ def status():
 
 @router.post("/auth/login")
 def login(req: LoginRequest, background_tasks: BackgroundTasks):
-    """Authenticate with Garmin Connect quickly and trigger data extraction in the background."""
+    """Authenticate with Garmin Connect and trigger data extraction in the background.
+
+    Two-step MFA flow:
+      1. POST {email, password} -> if the account requires MFA, responds with
+         {"status": "mfa_required"} instead of erroring.
+      2. POST {email, mfa_code} -> completes the login using the code.
+    """
     auth_mgr = DualAuthManager()
     try:
-        tokens = auth_mgr.login(req.email, req.password)
+        if req.mfa_code:
+            tokens = auth_mgr.login_resume(req.email, req.mfa_code)
+        else:
+            if not req.password:
+                raise HTTPException(status_code=400, detail="password is required to start login")
+            result = auth_mgr.login_start(req.email, req.password)
+            if result.get("needs_mfa"):
+                return JSONResponse({
+                    "status": "mfa_required",
+                    "message": "Enter the MFA code sent to your device.",
+                    "email": req.email
+                })
+            tokens = result
+
         # Schedule extraction in background to avoid blocking the HTTP response
         background_tasks.add_task(_run_background_sync, 7)
 
@@ -60,6 +80,8 @@ def login(req: LoginRequest, background_tasks: BackgroundTasks):
             "message": "Authenticated successfully with Garmin Connect.",
             "source": tokens.get("source", "oauth")
         })
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Login failed: {e}")
         raise HTTPException(status_code=400, detail=str(e))

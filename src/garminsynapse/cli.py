@@ -23,6 +23,25 @@ def start_server(host, port):
 
 
 @cli.command()
+@click.option("--email", prompt=True, help="Garmin Connect account email.")
+@click.option("--password", prompt=True, hide_input=True, help="Garmin Connect account password.")
+def login(email, password):
+    """Interactively authenticate with Garmin Connect, prompting for an MFA code if required."""
+    from garminsynapse.auth.manager import DualAuthManager
+
+    def _prompt_mfa():
+        return click.prompt("Enter the MFA code sent to your device")
+
+    auth_mgr = DualAuthManager()
+    try:
+        auth_mgr.login(email, password, prompt_mfa=_prompt_mfa)
+        click.echo("✅ Login successful! Tokens & credentials saved for future syncs.")
+    except Exception as e:
+        click.echo(f"❌ Login failed: {e}", err=True)
+        raise SystemExit(1)
+
+
+@cli.command()
 @click.option("--days", default=30, help="Days of data to extract.")
 def sync(days):
     """Sync health and activity data from Garmin Connect."""

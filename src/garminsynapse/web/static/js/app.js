@@ -282,36 +282,80 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const passwordGroup = document.getElementById('password-group');
+    const mfaGroup = document.getElementById('mfa-group');
+    const passwordInput = document.getElementById('password');
+    const mfaInput = document.getElementById('mfa-code');
+    let awaitingMfa = false;
+    let pendingEmail = null;
+
+    function resetLoginForm() {
+        awaitingMfa = false;
+        pendingEmail = null;
+        passwordGroup.classList.remove('hidden');
+        mfaGroup.classList.add('hidden');
+        passwordInput.value = '';
+        mfaInput.value = '';
+        loginBtnText.textContent = 'Authenticate & Sync';
+    }
+
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('email').value.trim();
-        const password = document.getElementById('password').value.trim();
 
         loginError.classList.add('hidden');
-        loginBtnText.textContent = 'Authenticating...';
         loginSpinner.classList.remove('hidden');
 
         try {
+            let body;
+            if (awaitingMfa) {
+                const mfaCode = mfaInput.value.trim();
+                if (!mfaCode) {
+                    loginError.textContent = 'Please enter the MFA code.';
+                    loginError.classList.remove('hidden');
+                    return;
+                }
+                loginBtnText.textContent = 'Verifying...';
+                body = { email: pendingEmail, mfa_code: mfaCode };
+            } else {
+                const password = passwordInput.value.trim();
+                if (!password) {
+                    loginError.textContent = 'Please enter your password.';
+                    loginError.classList.remove('hidden');
+                    return;
+                }
+                loginBtnText.textContent = 'Authenticating...';
+                body = { email, password };
+            }
+
             const res = await fetch('/api/v1/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify(body)
             });
 
             const data = await res.json();
 
             if (res.ok && data.status === 'success') {
+                resetLoginForm();
                 showDashboard();
                 setPreset('today');
+            } else if (res.ok && data.status === 'mfa_required') {
+                awaitingMfa = true;
+                pendingEmail = email;
+                passwordGroup.classList.add('hidden');
+                mfaGroup.classList.remove('hidden');
+                loginBtnText.textContent = 'Verify Code';
+                mfaInput.focus();
             } else {
-                loginError.textContent = data.detail || 'Invalid email or password.';
+                loginError.textContent = data.detail || data.message || 'Invalid email or password.';
                 loginError.classList.remove('hidden');
+                loginBtnText.textContent = awaitingMfa ? 'Verify Code' : 'Authenticate & Sync';
             }
         } catch (err) {
             loginError.textContent = 'Connection error. Please try again.';
             loginError.classList.remove('hidden');
         } finally {
-            loginBtnText.textContent = 'Authenticate & Sync';
             loginSpinner.classList.add('hidden');
         }
     });
@@ -319,6 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
             await fetch('/api/v1/auth/logout', { method: 'POST' });
+            resetLoginForm();
             showLogin();
         });
     }
