@@ -507,7 +507,11 @@ def user_profile():
 def activities(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-    limit: int = Query(100, ge=1, le=500)
+    limit: Optional[int] = Query(
+        None,
+        ge=1,
+        description="Maximum number of activities to return. Omit to return all matching activities.",
+    ),
 ):
     """List activities from SQLite database with optional custom date range filtering."""
     auth_mgr = DualAuthManager()
@@ -527,7 +531,10 @@ def activities(
             except Exception as pe:
                 logger.warning(f"Date range parse warning: {pe}")
 
-        recs = q.order_by(Activity.start_ts.desc()).limit(limit).all()
+        q = q.order_by(Activity.start_ts.desc())
+        if limit is not None:
+            q = q.limit(limit)
+        recs = q.all()
         for r in recs:
             result.append({
                 "id": str(r.activity_id),

@@ -15,6 +15,12 @@ DEFAULT_INGEST_DIR = Path.cwd() / "garmin_files" / "ingest"
 class GarminExtractor:
     """Extracts activity files and JSON health data from Garmin Connect API."""
 
+    # Page size used when paginating through Garmin's activity list.
+    _ACTIVITY_PAGE_SIZE = 100
+    # Safety cap on the number of pages fetched per sync, to bound worst-case
+    # API calls/time for accounts with an extremely long activity history.
+    _ACTIVITY_SAFETY_MAX_PAGES = 50
+
     def __init__(self, ingest_dir: Optional[Path] = None):
         self.ingest_dir = Path(ingest_dir) if ingest_dir else DEFAULT_INGEST_DIR
         self.ingest_dir.mkdir(parents=True, exist_ok=True)
@@ -86,7 +92,7 @@ class GarminExtractor:
             logger.debug(f"Failed to extract earned badges: {e}")
 
         try:
-            activities = api.get_activities(start=0, limit=50)
+            activities = self._fetch_activities_since(api, start_date)
             if activities:
                 out_path = self.ingest_dir / "activities_list.json"
                 with open(out_path, "w", encoding="utf-8") as f:
@@ -94,6 +100,61 @@ class GarminExtractor:
                 logger.info(f"Saved {len(activities)} activities to {out_path}")
         except Exception as e:
             logger.error(f"Failed to extract activities: {e}")
+
+    def _parse_activity_start(self, activity: Dict[str, Any]) -> Optional[datetime]:
+        """Parse an activity's startTimeLocal field, returning None if missing/unparseable."""
+        raw = activity.get("startTimeLocal")
+        if not raw:
+            return None
+        try:
+            return datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
+        except (ValueError, TypeError):
+            return None
+
+    def _fetch_activities_since(self, api: GarminAPI, start_date: datetime) -> List[Dict[str, Any]]:
+        """Paginate through Garmin's activity list (newest-first) until either the
+        oldest activity on a page predates start_date, a short/empty page signals
+        we've reached the end of the account's history, or a safety page-count cap
+        is hit (bounds worst-case API calls for very long activity histories).
+
+        `api.get_activities` raises on a genuine API failure rather than
+        returning an empty list, so an empty page here always means "no more
+        activities" and a raised exception always means the fetch failed and
+        should propagate (the caller's extract_all keeps the previous ingest
+        file rather than overwriting it with a partial result).
+        """
+        all_activities: List[Dict[str, Any]] = []
+        page_start = 0
+        reached_natural_end = False
+        for _ in range(self._ACTIVITY_SAFETY_MAX_PAGES):
+            page = api.get_activities(start=page_start, limit=self._ACTIVITY_PAGE_SIZE)
+            if not page:
+                reached_natural_end = True
+                break
+            # Filter out-of-window records before extending, since the page
+            # that first crosses start_date can contain a mix of in-window
+            # and older activities.
+            in_window = [
+                a for a in page
+                if (dt := self._parse_activity_start(a)) is None or dt >= start_date
+            ]
+            all_activities.extend(in_window)
+            if len(page) < self._ACTIVITY_PAGE_SIZE:
+                reached_natural_end = True
+                break
+            oldest_dt = self._parse_activity_start(page[-1])
+            if oldest_dt is not None and oldest_dt < start_date:
+                reached_natural_end = True
+                break
+            page_start += self._ACTIVITY_PAGE_SIZE
+        if not reached_natural_end:
+            logger.warning(
+                f"Activity pagination stopped after the safety cap of "
+                f"{self._ACTIVITY_SAFETY_MAX_PAGES} pages without reaching the end of "
+                f"the account's history or the requested date window; this sync may be "
+                f"partial. Re-run sync to continue fetching older activities."
+            )
+        return all_activities
 
     def _save_endpoint_json(self, api: GarminAPI, method_name: str, date_str: str, filename: str) -> None:
         """Helper to safely invoke endpoint method and write non-empty JSON."""
