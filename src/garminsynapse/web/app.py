@@ -45,6 +45,63 @@ class NoCacheStaticMiddleware(BaseHTTPMiddleware):
 app = FastAPI(title="Garmin Synapse", lifespan=lifespan)
 app.add_middleware(NoCacheStaticMiddleware)
 
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/api/status")
+@app.get("/api/v1/status")
+def get_system_status():
+    from datetime import datetime, timezone
+    from sqlalchemy import text
+    from garminsynapse.auth.manager import DualAuthManager
+    from garminsynapse.core.throttler import Throttler
+    from garminsynapse.db.manager import DatabaseManager
+
+    db_status = "unknown"
+    db_size_bytes = 0
+    wal_mode = False
+    try:
+        db_mgr = DatabaseManager()
+        if db_mgr.db_path.exists():
+            db_size_bytes = db_mgr.db_path.stat().st_size
+        with db_mgr.engine.connect() as conn:
+            mode = conn.execute(text("PRAGMA journal_mode;")).scalar()
+            wal_mode = (str(mode).lower() == "wal")
+            db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {e}"
+
+    auth_status = {
+        "authenticated": False,
+        "token_valid": False,
+        "rate_limited": Throttler.is_rate_limited(),
+        "cooldown_remaining_sec": Throttler.get_remaining_cooldown(),
+    }
+    try:
+        auth_mgr = DualAuthManager()
+        tokens = auth_mgr.token_manager.load_tokens()
+        if tokens:
+            auth_status["authenticated"] = True
+            auth_status["token_valid"] = not auth_mgr.token_manager.is_token_expired(tokens)
+            auth_status["expires_at"] = tokens.get("expires_at")
+    except Exception as e:
+        auth_status["error"] = str(e)
+
+    healthy = (db_status == "connected") and not Throttler.is_rate_limited()
+    return {
+        "status": "healthy" if healthy else "degraded",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": {
+            "status": db_status,
+            "size_bytes": db_size_bytes,
+            "wal_mode": wal_mode,
+        },
+        "auth": auth_status,
+    }
+
+
 app.include_router(router, prefix="/api/v1")
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
