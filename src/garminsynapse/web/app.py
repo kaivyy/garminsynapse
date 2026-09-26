@@ -51,7 +51,6 @@ def healthz():
 
 
 @app.get("/api/status")
-@app.get("/api/v1/status")
 def get_system_status():
     from datetime import datetime, timezone
     from sqlalchemy import text
