@@ -99,7 +99,7 @@ class DualAuthManager:
 
     def fast_refresh(self) -> Optional[Dict[str, Any]]:
         """Fast OAuth token refresh via diauth.garmin.com without browser SSO simulation (~300ms)."""
-        with _login_lock:
+        with _login_lock, self.token_manager.lock():
             tokens = self.token_manager.load_tokens()
             if not tokens or not tokens.get("client_state"):
                 return None
@@ -144,13 +144,13 @@ class DualAuthManager:
         return tokens
 
     def auto_login(self, force: bool = False) -> Optional[Dict[str, Any]]:
-        """Attempt to automatically log in using saved credentials with thread deduplication."""
-        with _login_lock:
-            # Re-check inside lock in case another thread already refreshed
+        """Attempt to automatically log in using saved credentials with process deduplication."""
+        with _login_lock, self.token_manager.lock():
+            # Re-check inside lock in case another process already refreshed
             if not force:
                 tokens = self.token_manager.load_tokens()
                 if tokens and not self.token_manager.is_token_expired(tokens):
-                    logger.info("Tokens already refreshed by concurrent thread.")
+                    logger.info("Tokens already refreshed by concurrent process.")
                     return tokens
 
             creds = self.token_manager.load_credentials()

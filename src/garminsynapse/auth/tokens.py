@@ -20,6 +20,28 @@ class TokenManager:
         self.token_file = Path(token_file) if token_file else DEFAULT_TOKEN_FILE
         self.cred_file = self.token_file.parent / "credentials.json"
 
+    def lock(self, timeout: float = 10.0):
+        """Cross-process file lock protecting token cache files."""
+        import fcntl
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _flock():
+            lock_path = self.token_file.parent / "tokens.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_fd = open(lock_path, "a+")
+            try:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+                yield
+            finally:
+                try:
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
+                lock_fd.close()
+
+        return _flock()
+
     def save_tokens(self, tokens: Dict[str, Any]) -> None:
         """Save token dictionary to JSON file atomically."""
         self.token_file.parent.mkdir(parents=True, exist_ok=True)

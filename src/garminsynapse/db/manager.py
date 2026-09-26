@@ -28,6 +28,9 @@ class DatabaseManager:
         def _set_sqlite_pragma(dbapi_conn, connection_record):
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA foreign_keys=ON;")
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.execute("PRAGMA busy_timeout=5000;")
+            cursor.execute("PRAGMA synchronous=NORMAL;")
             cursor.close()
 
         self.init_db()
@@ -36,6 +39,9 @@ class DatabaseManager:
         """Create all tables, migrate columns, and enforce foreign keys."""
         with self.engine.connect() as conn:
             conn.execute(text("PRAGMA foreign_keys=ON;"))
+            conn.execute(text("PRAGMA journal_mode=WAL;"))
+            conn.execute(text("PRAGMA busy_timeout=5000;"))
+            conn.execute(text("PRAGMA synchronous=NORMAL;"))
             conn.commit()
         Base.metadata.create_all(bind=self.engine)
         self._migrate_columns()
