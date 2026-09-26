@@ -21,10 +21,15 @@ class GarminExtractor:
     # API calls/time for accounts with an extremely long activity history.
     _ACTIVITY_SAFETY_MAX_PAGES = 50
 
-    def __init__(self, ingest_dir: Optional[Path] = None):
+    def __init__(self, ingest_dir: Optional[Path] = None, pacing_delay: Optional[float] = None):
         self.ingest_dir = Path(ingest_dir) if ingest_dir else DEFAULT_INGEST_DIR
         self.ingest_dir.mkdir(parents=True, exist_ok=True)
         self.auth_mgr = DualAuthManager()
+        if pacing_delay is not None:
+            self.pacing_delay = pacing_delay
+        else:
+            import os
+            self.pacing_delay = 0.0 if os.environ.get("PYTEST_CURRENT_TEST") else 0.5
 
     def extract_all(self, days: int = 7) -> None:
         """Extract daily health stats, sleep, stress, HRV, body battery, respiration, training status, and activities."""
@@ -48,21 +53,30 @@ class GarminExtractor:
             date_str = curr.strftime("%Y-%m-%d")
             logger.info(f"Extracting all Garmin data metrics for {date_str}...")
 
-            self._save_endpoint_json(api, "get_sleep_data", date_str, f"{date_str}_SLEEP.json")
-            self._save_endpoint_json(api, "get_daily_stats", date_str, f"{date_str}_STATS.json")
-            self._save_endpoint_json(api, "get_stress_data", date_str, f"{date_str}_STRESS.json")
-            self._save_endpoint_json(api, "get_body_battery", date_str, f"{date_str}_BODY_BATTERY.json")
-            self._save_endpoint_json(api, "get_hrv_data", date_str, f"{date_str}_HRV.json")
-            self._save_endpoint_json(api, "get_heart_rates", date_str, f"{date_str}_HEART_RATE.json")
-            self._save_endpoint_json(api, "get_respiration_data", date_str, f"{date_str}_RESPIRATION.json")
-            self._save_endpoint_json(api, "get_spo2_data", date_str, f"{date_str}_SPO2.json")
-            self._save_endpoint_json(api, "get_training_status", date_str, f"{date_str}_TRAINING_STATUS.json")
-            self._save_endpoint_json(api, "get_training_readiness", date_str, f"{date_str}_READINESS.json")
-            self._save_endpoint_json(api, "get_hydration_data", date_str, f"{date_str}_HYDRATION.json")
-            self._save_endpoint_json(api, "get_fitnessage_data", date_str, f"{date_str}_FITNESS_AGE.json")
+            metric_endpoints = [
+                ("get_sleep_data", f"{date_str}_SLEEP.json"),
+                ("get_daily_stats", f"{date_str}_STATS.json"),
+                ("get_stress_data", f"{date_str}_STRESS.json"),
+                ("get_body_battery", f"{date_str}_BODY_BATTERY.json"),
+                ("get_hrv_data", f"{date_str}_HRV.json"),
+                ("get_heart_rates", f"{date_str}_HEART_RATE.json"),
+                ("get_respiration_data", f"{date_str}_RESPIRATION.json"),
+                ("get_spo2_data", f"{date_str}_SPO2.json"),
+                ("get_training_status", f"{date_str}_TRAINING_STATUS.json"),
+                ("get_training_readiness", f"{date_str}_READINESS.json"),
+                ("get_hydration_data", f"{date_str}_HYDRATION.json"),
+                ("get_fitnessage_data", f"{date_str}_FITNESS_AGE.json"),
+            ]
 
-            import time
-            time.sleep(0.3)
+            from garminsynapse.core.throttler import Throttler
+            for method_name, filename in metric_endpoints:
+                if Throttler.is_rate_limited():
+                    logger.warning("Throttler is rate-limited; pausing extraction cycle.")
+                    break
+                self._save_endpoint_json(api, method_name, date_str, filename)
+
+            if self.pacing_delay > 0:
+                Throttler.adaptive_sleep(self.pacing_delay * 2.0, self.pacing_delay * 3.5)
             curr += timedelta(days=1)
 
         try:
@@ -165,5 +179,8 @@ class GarminExtractor:
                 if data:
                     with open(self.ingest_dir / filename, "w", encoding="utf-8") as f:
                         json.dump(data, f, indent=2)
+                if self.pacing_delay > 0:
+                    from garminsynapse.core.throttler import Throttler
+                    Throttler.adaptive_sleep(self.pacing_delay * 0.8, self.pacing_delay * 1.5)
         except Exception as e:
             logger.error(f"Failed to extract {method_name} for {date_str}: {e}")

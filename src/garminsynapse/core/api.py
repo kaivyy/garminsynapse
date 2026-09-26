@@ -16,34 +16,57 @@ logger = logging.getLogger(__name__)
 
 
 def with_auto_retry(func):
-    """Decorator to retry requests on 5xx, 401, or network errors with auto-login."""
+    """Decorator to retry requests on 5xx, 401, or network errors with auto-login and backoff."""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            err_str = str(e)
-            if "401" in err_str or "403" in err_str or "unauthenticated" in err_str.lower():
-                logger.info(f"API call {func.__name__} encountered auth error: {e}. Attempting fast token refresh and retry...")
-                from garminsynapse.auth.manager import DualAuthManager
-                auth_mgr = DualAuthManager()
-                new_tokens = auth_mgr.fast_refresh() or auth_mgr.auto_login()
-                if new_tokens:
-                    if args and isinstance(args[0], GarminAPI):
-                        api_inst = args[0]
-                        if new_tokens.get("client_state") and _GARMINCONNECT_AVAILABLE:
-                            try:
-                                g = garminconnect.Garmin()
-                                g.client.loads(new_tokens["client_state"])
-                                g.display_name = new_tokens.get("user_id")
-                                api_inst._garmin_instance = g
-                                if hasattr(g.client, "get_api_headers"):
-                                    api_inst.session.headers.update(g.client.get_api_headers())
-                            except Exception as reload_err:
-                                logger.warning(f"Failed to reload client after token refresh: {reload_err}")
-                    return func(*args, **kwargs)
-            logger.warning(f"API call {func.__name__} failed: {e}. Retrying...")
-            return func(*args, **kwargs)
+        from garminsynapse.core.throttler import Throttler
+        import random
+        import time
+
+        max_retries = 3
+        base_delay = 1.0
+        max_delay = 15.0
+
+        for attempt in range(max_retries):
+            Throttler.ensure_not_rate_limited()
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str or "rate limit" in err_str.lower() or "too many requests" in err_str.lower():
+                    Throttler.mark_rate_limited(cooldown_seconds=60.0)
+                    raise
+
+                if "401" in err_str or "403" in err_str or "unauthenticated" in err_str.lower():
+                    logger.info(f"API call {func.__name__} encountered auth error: {e}. Attempting fast token refresh and retry...")
+                    from garminsynapse.auth.manager import DualAuthManager
+                    auth_mgr = DualAuthManager()
+                    new_tokens = auth_mgr.fast_refresh() or auth_mgr.auto_login()
+                    if new_tokens:
+                        if args and isinstance(args[0], GarminAPI):
+                            api_inst = args[0]
+                            if new_tokens.get("client_state") and _GARMINCONNECT_AVAILABLE:
+                                try:
+                                    g = garminconnect.Garmin()
+                                    g.client.loads(new_tokens["client_state"])
+                                    g.display_name = new_tokens.get("user_id")
+                                    api_inst._garmin_instance = g
+                                    if hasattr(g.client, "get_api_headers"):
+                                        api_inst.session.headers.update(g.client.get_api_headers())
+                                except Exception as reload_err:
+                                    logger.warning(f"Failed to reload client after token refresh: {reload_err}")
+                        continue
+
+                if attempt < max_retries - 1:
+                    delay = min(max_delay, base_delay * (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    logger.warning(
+                        f"API call {func.__name__} failed (attempt {attempt + 1}/{max_retries}): {e}. "
+                        f"Retrying in {delay:.2f}s..."
+                    )
+                    time.sleep(delay)
+                else:
+                    logger.error(f"API call {func.__name__} failed after {max_retries} attempts: {e}")
+                    raise
     return wrapper
 
 
