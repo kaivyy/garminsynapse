@@ -33,6 +33,8 @@ htmlcov/
 
 # Local databases and downloaded files
 *.db
+*.db-wal
+*.db-shm
 garmin_data.db
 garmin_files/
 tokens.json
