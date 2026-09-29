@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.3] - 2026-09-29
+
+### ⚡ Engine Resilience & Throttling
+- **Throttler & Adaptive Jitter Pacing** (`core/throttler.py`, `core/api.py`, `etl/extractor.py`):
+  - Added dedicated thread-safe `Throttler` to handle Garmin API rate-limiting (HTTP 429) gracefully with dynamic cooldown tracking.
+  - Implemented `adaptive_sleep()` with randomized jitter to emulate organic traffic patterns and prevent Cloudflare/Garmin throttling.
+  - Extractor batch ingest now applies jittered pacing across all 12 metric endpoints and halts gracefully during active cooldown.
+  - Enhanced API auto-retry decorator with exponential backoff on transient errors and automatic throttler activation.
+
+### 🔒 Cross-Process Concurrency & Database Reliability
+- **Cross-Process File Lock for Token Store** (`auth/tokens.py`, `auth/manager.py`):
+  - Implemented `TokenManager.lock()` using OS-level `fcntl.flock` on `tokens.lock`.
+  - Prevents race conditions and token clobbering when Web dashboard, MCP server, and CLI refresh OAuth tokens concurrently.
+- **SQLite WAL Mode & Busy Timeout** (`db/manager.py`):
+  - Enforced SQLite pragmas: `journal_mode=WAL`, `busy_timeout=5000`, and `synchronous=NORMAL`.
+  - Enables concurrent reads and writes without database lock contention errors.
+
+### 🩺 System Telemetry & Observability
+- **Health & Telemetry Endpoints** (`web/app.py`):
+  - Added lightweight `GET /healthz` liveness/readiness endpoint.
+  - Added comprehensive `GET /api/status` telemetry endpoint exposing database status (WAL mode, size), authentication state (token expiration), and throttler health (active rate-limits, remaining cooldown seconds).
+  - Maintained complete backwards compatibility for `/api/v1/status`.
+
+### 🛡️ Runtime & Process Supervisor Hardening
+- **PM2 Backoff & Core Dump Suppression** (`run.sh`, `ecosystem.config.js`, `ecosystem.config.cjs`):
+  - Created isolated runner script `run.sh` enforcing virtualenv Python and suppressing core dump generation (`ulimit -c 0`) to prevent disk exhaustion.
+  - Added PM2 exponential backoff restart delay (`exp_backoff_restart_delay: 2000`) and capped max memory to 500MB.
+
+### 🧪 Test Suite Expansion
+- Added 13 new unit tests covering throttler backoff, SQLite WAL mode, cross-process locks, and telemetry endpoints (44/44 tests passing).
+
 ## [v0.4.2] - 2026-09-15
 
 ### 🔐 Two-Factor Authentication (MFA / 2FA) Support
