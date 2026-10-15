@@ -319,6 +319,23 @@ class GarminProcessor:
                         session.add(BodyBattery(user_id=user_id, calendar_date=parsed_date,
                             charged=charged_val, drained=drained_val))
                 session.commit()
+
+            elif "_HEART_RATE" in json_path.name and isinstance(data, dict):
+                user_id = self._extract_user_id(session, data)
+                self._ensure_user_exists(session, user_id)
+                cal_str = cal_date_str or data.get("calendarDate") or datetime.utcnow().strftime("%Y-%m-%d")
+                parsed_date = datetime.strptime(cal_str, "%Y-%m-%d").date()
+                rhr = data.get("restingHeartRate")
+                min_hr = data.get("minHeartRate")
+                max_hr = data.get("maxHeartRate")
+                existing = session.query(DailySummary).filter_by(user_id=user_id, calendar_date=parsed_date).first()
+                if existing:
+                    if rhr is not None: existing.resting_hr = rhr
+                    if min_hr is not None: existing.min_hr = min_hr
+                    if max_hr is not None: existing.max_hr = max_hr
+                else:
+                    session.add(DailySummary(user_id=user_id, calendar_date=parsed_date, resting_hr=rhr, min_hr=min_hr, max_hr=max_hr))
+                session.commit()
         except Exception as e:
             session.rollback()
             logger.error(f"Failed to process JSON summary {json_path}: {e}")
@@ -359,7 +376,12 @@ class GarminProcessor:
                     duration=act.get("duration"),
                     distance=act.get("distance"),
                     average_hr=act.get("averageHR"),
-                    calories=act.get("calories")
+                    max_hr=act.get("maxHR") or act.get("maxHeartRate"),
+                    calories=act.get("calories"),
+                    elapsed_duration=act.get("elapsedDuration"),
+                    elevation_gain=act.get("elevationGain"),
+                    average_speed=act.get("averageSpeed"),
+                    max_speed=act.get("maxSpeed")
                 )
                 session.merge(activity_record)
             session.commit()

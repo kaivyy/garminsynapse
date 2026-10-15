@@ -1,6 +1,6 @@
 """Native MCP Server tools with full database, API, and analytics integration."""
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 from mcp.server import MCPServer
 from sqlalchemy import text
@@ -247,7 +247,7 @@ def get_hrv_trends(date_str: str = "") -> Dict[str, Any]:
 
 @mcp.tool()
 def list_activities(limit: int = 20) -> List[Dict[str, Any]]:
-    """List recent Garmin workouts & activities with distance, duration, HR, and calories."""
+    """List recent Garmin workouts & activities with distance, duration, HR (avg & max), calories, and elevation gain."""
     db = DatabaseManager()
     session = db.get_session()
     result = []
@@ -262,6 +262,8 @@ def list_activities(limit: int = 20) -> List[Dict[str, Any]]:
                 "duration_min": round((r.duration or 0) / 60, 1),
                 "distance_km": round((r.distance or 0) / 1000, 2),
                 "avg_hr": r.average_hr,
+                "max_hr": r.max_hr,
+                "elevation_gain_m": r.elevation_gain,
                 "calories": r.calories
             })
     except Exception as e:
@@ -469,4 +471,164 @@ def get_user_profile() -> Dict[str, Any]:
         return {"status": "success", "profile": api.get_user_profile()}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_heart_rate_zones() -> Dict[str, Any]:
+    """Get user's configured Heart Rate Zones (Zone 1 to Zone 5 bpm floors, Max HR, resting HR, and Lactate Threshold HR)."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    try:
+        if hasattr(api._garmin_instance, "get_heart_rate_zones"):
+            zones = api._garmin_instance.get_heart_rate_zones()
+            return {"status": "success", "zones": zones}
+        return {"status": "unavailable", "message": "Heart rate zones not available"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_activity_hr_zones(activity_id: int) -> Dict[str, Any]:
+    """Get time spent in each Heart Rate Zone (Zone 1 to Zone 5 seconds/percentage) for a specific workout."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    try:
+        if hasattr(api._garmin_instance, "get_activity_hr_in_timezones"):
+            zones = api._garmin_instance.get_activity_hr_in_timezones(activity_id)
+            total_sec = sum(z.get("secsInZone", 0) for z in zones if isinstance(z, dict))
+            enriched = []
+            for z in zones:
+                if isinstance(z, dict):
+                    sec = z.get("secsInZone", 0)
+                    pct = round((sec / total_sec * 100), 1) if total_sec > 0 else 0
+                    enriched.append({
+                        **z,
+                        "minsInZone": round(sec / 60, 1),
+                        "percentInZone": pct
+                    })
+                else:
+                    enriched.append(z)
+            return {
+                "status": "success",
+                "activity_id": activity_id,
+                "total_duration_sec": total_sec,
+                "zones": enriched
+            }
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_training_status(date_str: str = "") -> Dict[str, Any]:
+    """Get Training Status (Productive, Peaking, Maintaining, Recovery, etc.), VO2 Max, and Acute Training Load."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    from datetime import datetime
+    d = date_str or datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_training_status"):
+            res = api._garmin_instance.get_training_status(d)
+            return {"status": "success", "date": d, "training_status": res}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_personal_records() -> Dict[str, Any]:
+    """Get user's all-time Personal Records (PRs/PBs) for 1K, 1 Mile, 5K, 10K, Half Marathon, Marathon, and longest workouts."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    try:
+        if hasattr(api._garmin_instance, "get_personal_record"):
+            prs = api._garmin_instance.get_personal_record()
+            return {"status": "success", "personal_records": prs}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_intensity_minutes(date_str: str = "") -> Dict[str, Any]:
+    """Get daily & weekly intensity minutes (Moderate and Vigorous active minutes vs target)."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    from datetime import datetime
+    d = date_str or datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_intensity_minutes_data"):
+            data = api._garmin_instance.get_intensity_minutes_data(d)
+            return {"status": "success", "date": d, "intensity_minutes": data}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_activity_exercise_sets(activity_id: int) -> Dict[str, Any]:
+    """Get strength training exercise sets, exercise names, reps, weight (kg), and rest intervals for an activity."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    try:
+        if hasattr(api._garmin_instance, "get_activity_exercise_sets"):
+            sets = api._garmin_instance.get_activity_exercise_sets(activity_id)
+            return {"status": "success", "activity_id": activity_id, "exercise_sets": sets}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_body_composition(date_str: str = "") -> Dict[str, Any]:
+    """Get user weight (kg), BMI, body fat %, skeletal muscle mass, bone mass, and body water %."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    from datetime import datetime
+    d = date_str or datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_body_composition"):
+            res = api._garmin_instance.get_body_composition(d)
+            return {"status": "success", "date": d, "body_composition": res}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_activity_weather(activity_id: int) -> Dict[str, Any]:
+    """Get weather conditions during an activity (temperature, humidity, wind, weather condition)."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    try:
+        if hasattr(api._garmin_instance, "get_activity_weather"):
+            weather = api._garmin_instance.get_activity_weather(activity_id)
+            return {"status": "success", "activity_id": activity_id, "weather": weather}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def garmin_raw_api(endpoint_path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Universal raw Garmin Connect API gateway: query any Garmin Connect service endpoint path directly."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return {"error": "unauthenticated"}
+    try:
+        if hasattr(api._garmin_instance, "connectapi"):
+            res = api._garmin_instance.connectapi(endpoint_path, params=params or {})
+            return {"status": "success", "endpoint": endpoint_path, "data": res}
+        return {"status": "unavailable"}
+    except Exception as e:
+        return {"status": "error", "endpoint": endpoint_path, "message": str(e)}
+
 

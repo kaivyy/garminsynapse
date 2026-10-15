@@ -268,6 +268,8 @@ def summary(
     
     steps = 0
     resting_hr = None
+    min_hr = None
+    max_hr = None
     sleep_score = None
     body_battery = None
     hrv_status = None
@@ -340,6 +342,12 @@ def summary(
             
             rhrs = [r.resting_hr for r in all_daily if r.resting_hr is not None]
             resting_hr = round(sum(rhrs) / len(rhrs)) if rhrs else None
+
+            min_hrs = [r.min_hr for r in all_daily if r.min_hr is not None]
+            min_hr = min(min_hrs) if min_hrs else None
+
+            max_hrs = [r.max_hr for r in all_daily if r.max_hr is not None]
+            max_hr = max(max_hrs) if max_hrs else None
             
             resps = [r.avg_respiration for r in all_daily if r.avg_respiration is not None]
             respiration_rate = round(sum(resps) / len(resps), 1) if resps else None
@@ -363,6 +371,8 @@ def summary(
             if daily_rec:
                 if daily_rec.steps is not None: steps = daily_rec.steps
                 if daily_rec.resting_hr is not None: resting_hr = daily_rec.resting_hr
+                if daily_rec.min_hr is not None: min_hr = daily_rec.min_hr
+                if daily_rec.max_hr is not None: max_hr = daily_rec.max_hr
                 if daily_rec.avg_respiration is not None: respiration_rate = daily_rec.avg_respiration
                 if daily_rec.avg_spo2 is not None: spo2 = daily_rec.avg_spo2
             if sleep_rec and sleep_rec.sleep_score:
@@ -395,6 +405,8 @@ def summary(
         "total_distance_km": total_distance_km,
         "total_calories": total_calories,
         "resting_hr": resting_hr,
+        "min_hr": min_hr,
+        "max_hr": max_hr,
         "sleep_score": sleep_score,
         "body_battery": body_battery,
         "hrv_status": hrv_status,
@@ -662,3 +674,99 @@ def get_activity_splits_route(activity_id: int):
         logger.error(f"Error fetching splits for activity {activity_id}: {e}")
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/hr-zones")
+def get_user_hr_zones():
+    """Fetch user's configured Heart Rate Zones (Zone 1 to Zone 5 floors, Max HR, resting HR)."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+    try:
+        if hasattr(api._garmin_instance, "get_heart_rate_zones"):
+            zones = api._garmin_instance.get_heart_rate_zones()
+            return JSONResponse({"status": "success", "zones": zones})
+        return JSONResponse({"status": "unavailable", "message": "Heart rate zones not available"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@router.get("/activities/{activity_id}/hr-zones")
+def get_activity_hr_zones_route(activity_id: int):
+    """Fetch time spent in each Heart Rate Zone (Zone 1 to 5) for a specific activity."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+    try:
+        if hasattr(api._garmin_instance, "get_activity_hr_in_timezones"):
+            zones = api._garmin_instance.get_activity_hr_in_timezones(activity_id)
+            total_sec = sum(z.get("secsInZone", 0) for z in zones if isinstance(z, dict))
+            enriched = []
+            for z in zones:
+                if isinstance(z, dict):
+                    sec = z.get("secsInZone", 0)
+                    pct = round((sec / total_sec * 100), 1) if total_sec > 0 else 0
+                    enriched.append({
+                        **z,
+                        "minsInZone": round(sec / 60, 1),
+                        "percentInZone": pct
+                    })
+                else:
+                    enriched.append(z)
+            return JSONResponse({
+                "status": "success",
+                "activity_id": activity_id,
+                "total_duration_sec": total_sec,
+                "zones": enriched
+            })
+        return JSONResponse({"status": "unavailable"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@router.get("/training-status")
+def get_training_status_route(date: Optional[str] = None):
+    """Fetch Garmin Training Status, Acute Training Load, and VO2 Max metrics."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+    d = date or datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_training_status"):
+            res = api._garmin_instance.get_training_status(d)
+            return JSONResponse({"status": "success", "date": d, "training_status": res})
+        return JSONResponse({"status": "unavailable"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@router.get("/personal-records")
+def get_personal_records_route():
+    """Fetch user's all-time Personal Records (PRs) from Garmin Connect."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+    try:
+        if hasattr(api._garmin_instance, "get_personal_record"):
+            prs = api._garmin_instance.get_personal_record()
+            return JSONResponse({"status": "success", "personal_records": prs})
+        return JSONResponse({"status": "unavailable"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@router.get("/intensity-minutes")
+def get_intensity_minutes_route(date: Optional[str] = None):
+    """Fetch daily/weekly intensity minutes compared to target."""
+    api = GarminAPI()
+    if not api._garmin_instance:
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+    d = date or datetime.now().strftime("%Y-%m-%d")
+    try:
+        if hasattr(api._garmin_instance, "get_intensity_minutes_data"):
+            data = api._garmin_instance.get_intensity_minutes_data(d)
+            return JSONResponse({"status": "success", "date": d, "intensity_minutes": data})
+        return JSONResponse({"status": "unavailable"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+

@@ -188,30 +188,46 @@ In **Editor Settings** -> **Model Context Protocol (MCP)** -> **Add New Command*
 
 ---
 
-## 🛠️ MCP Tools Reference (20 Native AI Tools)
+## 🛠️ MCP Tools Reference (30 Native AI Tools)
 
 | Tool Name | Parameters | Description |
 |---|---|---|
+| **System & Auth** | | |
 | `garmin_status` | None | Check auth, database, and MCP system status |
-| `garmin_login` | `email`, `password` | Authenticate with Garmin Connect |
+| `garmin_login` | `email`, `password`, `mfa_code` | Authenticate with Garmin Connect (supports 2FA / MFA resume) |
 | `get_garmin_devices` | None | Get registered watch model names, serial numbers, unit IDs, and firmware |
-| `get_live_metrics` | None | Get live point-in-time metrics (Body Battery %, charged/drained, Stress, Steps, Nap) |
 | `garmin_sync` | `days` (default 7) | Extract recent Garmin metrics to SQLite database |
-| `get_daily_summary` | `date_str` (`YYYY-MM-DD`) | Get daily steps, RHR, stress, body battery, calories, distance |
+| `get_user_profile` | None | Get user social and biometric profile (weight, height, gender, VO2 Max) |
+| **Live & Daily Biometrics** | | |
+| `get_live_metrics` | None | Get live point-in-time metrics (Body Battery %, charged/drained, Stress, Steps, Nap) |
+| `get_daily_summary` | `date_str` (`YYYY-MM-DD`) | Get daily steps, resting HR, min/max HR, stress, body battery, calories, distance |
 | `get_sleep_analysis` | `date_str` (`YYYY-MM-DD`) | Get sleep stages, sleep score, and daytime nap intervals |
-| `get_training_readiness` | `date_str` (optional) | Get Training Readiness score (0–100) and recovery factors |
-| `get_race_predictions` | None | Get race time predictions for 5K, 10K, Half Marathon, and Marathon |
-| `get_earned_badges` | None | Get user's earned Garmin Connect achievement badges |
 | `get_hrv_trends` | `date_str` (optional) | Get HRV status, weekly baseline, and nightly averages |
 | `get_respiration_data` | `date_str` (optional) | Get waking and sleep respiration rates (brpm) |
 | `get_spo2_data` | `date_str` (optional) | Get blood oxygen saturation (SpO2 / Pulse Ox %) daily time-series |
 | `get_hydration_data` | `date_str` (optional) | Get daily water intake and hydration logs |
 | `get_fitness_age` | None | Get calculated Fitness Age vs chronological age |
-| `get_user_profile` | None | Get user social and biometric profile (weight, height, gender, VO2 Max) |
-| `list_activities` | `limit` (default 20) | List recent workouts (distance, duration, HR, calories) |
-| `get_activity_details` | `activity_id` | Get detailed time-series metrics & map polyline |
+| **Heart Rate, Training & Performance** | | |
+| `get_heart_rate_zones` | None | Get user's configured Zone 1 to Zone 5 BPM floors, Max HR, resting HR, and LTHR |
+| `get_activity_hr_zones` | `activity_id` | Get exact time (sec/min) and percentage spent in Zone 1 through Zone 5 for a workout |
+| `get_training_status` | `date_str` (optional) | Get Training Status (Productive, Peaking, etc.), Acute Training Load, and VO2 Max |
+| `get_training_readiness` | `date_str` (optional) | Get Training Readiness score (0–100) and recovery factor breakdown |
+| `get_intensity_minutes` | `date_str` (optional) | Get Moderate & Vigorous active intensity minutes vs weekly target |
+| `get_personal_records` | None | Get all-time Personal Records (PRs/PBs) for 1K, 5K, 10K, Half, Marathon, longest |
+| `get_race_predictions` | None | Get race time predictions for 5K, 10K, Half Marathon, and Marathon |
+| `get_earned_badges` | None | Get user's earned Garmin Connect achievement badges and trophies |
+| **Activities & Files** | | |
+| `list_activities` | `limit` (default 20) | List recent workouts (distance, duration, avg HR, max HR, calories, elevation gain) |
+| `get_activity_details` | `activity_id` | Get detailed time-series metrics (HR, cadence, power, speed, elevation polyline) |
+| `get_activity_splits` | `activity_id` | Get per-km or per-lap splits with avg HR, max HR, pace, cadence, elevation |
+| `get_activity_weather` | `activity_id` | Get weather conditions during workout (temperature, humidity, wind) |
+| `get_activity_exercise_sets` | `activity_id` | Get gym/strength workout sets, exercise names, reps, and weights (kg) |
 | `download_fit_file` | `activity_id` | Download raw binary `.FIT` file to local storage |
-| `query_garmin_db` | `sql_query` | Execute safe `SELECT` query on SQLite DB (40+ tables) |
+| **Body & Health Composition** | | |
+| `get_body_composition` | `date_str` (optional) | Get user weight (kg), BMI, body fat %, muscle mass, water %, and bone mass |
+| **Universal Query & Power Tools** | | |
+| `query_garmin_db` | `sql_query` | Execute safe `SELECT` query on local SQLite DB (40+ tables) |
+| `garmin_raw_api` | `endpoint_path`, `params` | Universal gateway: query any Garmin Connect service endpoint path directly |
 
 ---
 
@@ -224,13 +240,19 @@ In **Editor Settings** -> **Model Context Protocol (MCP)** -> **Add New Command*
 | `POST` | `/api/v1/auth/logout` | Clear active token session |
 | `GET` | `/api/v1/devices` | Connected Garmin watch info with 6-hour cache |
 | `GET` | `/api/v1/live` | Live real-time biometric readings (Body Battery, Stress, Steps, Nap) |
-| `GET` | `/api/v1/summary` | Health gauges (Steps, HR, Sleep, Battery, HRV, SpO2, Respiration) |
+| `GET` | `/api/v1/summary` | Health gauges (Steps, Resting HR, Min/Max HR, Sleep, Battery, HRV, SpO2, Respiration) |
 | `GET` | `/api/v1/readiness` | Training Readiness score & recovery factor breakdown |
+| `GET` | `/api/v1/hr-zones` | User profile Heart Rate Zones (Zone 1 to Zone 5 thresholds) |
+| `GET` | `/api/v1/training-status` | Training Status, Acute Training Load, and VO2 Max metrics |
+| `GET` | `/api/v1/personal-records` | User all-time Personal Records (PRs/PBs) |
+| `GET` | `/api/v1/intensity-minutes` | Daily/weekly active intensity minutes vs goal |
 | `GET` | `/api/v1/predictions` | Race time predictions (5K, 10K, Half Marathon, Marathon) |
 | `GET` | `/api/v1/badges` | User's earned Garmin Connect achievement badges |
 | `GET` | `/api/v1/profile` | User social profile & biometric parameters |
-| `GET` | `/api/v1/activities` | List recent logged workouts with date filters |
+| `GET` | `/api/v1/activities` | List recent logged workouts with date filters (includes max HR & elevation) |
 | `GET` | `/api/v1/activity/{id}` | Single activity full details |
+| `GET` | `/api/v1/activities/{id}/splits` | Per-km / per-lap workout splits |
+| `GET` | `/api/v1/activities/{id}/hr-zones` | Time and percentage spent in Zone 1–5 for workout |
 | `POST` | `/api/v1/sync` | Trigger manual data extraction (with 5-minute cooldown) |
 
 ---
