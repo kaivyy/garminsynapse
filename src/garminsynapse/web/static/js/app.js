@@ -425,6 +425,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 let finalHR = summary.resting_hr;
                 hrVal.innerHTML = finalHR ? `${finalHR} <span class="unit">bpm</span>` : `-- <span class="unit">bpm</span>`;
 
+                const hrRangePill = document.getElementById('hr-range-pill');
+                const hrMinVal = document.getElementById('hr-min-val');
+                const hrMaxVal = document.getElementById('hr-max-val');
+                if (hrRangePill && hrMinVal && hrMaxVal) {
+                    if (summary.min_hr !== null && summary.min_hr !== undefined && summary.max_hr !== null && summary.max_hr !== undefined) {
+                        hrMinVal.textContent = summary.min_hr;
+                        hrMaxVal.textContent = summary.max_hr;
+                        hrRangePill.classList.remove('hidden');
+                    } else {
+                        hrRangePill.classList.add('hidden');
+                    }
+                }
+
                 sleepScore.innerHTML = summary.sleep_score ? `${summary.sleep_score} <span class="unit">/ 100</span>` : `-- <span class="unit">/ 100</span>`;
 
                 let finalBB = summary.body_battery;
@@ -551,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td>${act.start_ts || '--'}</td>
                         <td>${act.duration || '--'}</td>
                         <td>${act.distance || '--'} km</td>
-                        <td>${act.avg_hr || '--'} bpm</td>
+                        <td>${act.avg_hr ? `${Math.round(act.avg_hr)}${act.max_hr ? ` <span class="sub-metric">/ ${Math.round(act.max_hr)}</span>` : ''} <span class="unit-sm">bpm</span>` : '--'}</td>
                         <td>${act.calories || '--'} kcal</td>
                         <td><span class="green-text">Synced</span></td>
                     `;
@@ -624,6 +637,83 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 splitsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--alert-color);">Failed to load splits.</td></tr>';
+            }
+
+            // Fetch Heart Rate Zones
+            const hrzonesContainer = document.getElementById('hrzones-container');
+            const zoneBreakdownList = document.getElementById('zone-breakdown-list');
+            const hrzonesTotalTime = document.getElementById('hrzones-total-time');
+
+            if (hrzonesContainer) {
+                hrzonesContainer.classList.add('hidden');
+                if (zoneBreakdownList) zoneBreakdownList.innerHTML = '';
+            }
+
+            try {
+                const zRes = await fetch(`/api/v1/activities/${act.id}/hr-zones`);
+                if (zRes.ok) {
+                    const zData = await zRes.json();
+                    if (zData && zData.status === 'success' && Array.isArray(zData.zones) && zData.total_duration_sec > 0) {
+                        if (hrzonesContainer) hrzonesContainer.classList.remove('hidden');
+
+                        const zoneMeta = [
+                            { num: 1, name: 'Warm Up', color: '#64748b' },
+                            { num: 2, name: 'Easy', color: '#0ea5e9' },
+                            { num: 3, name: 'Aerobic', color: '#10b981' },
+                            { num: 4, name: 'Threshold', color: '#f97316' },
+                            { num: 5, name: 'Maximum', color: '#ef4444' }
+                        ];
+
+                        const totalM = Math.floor(zData.total_duration_sec / 60);
+                        const totalS = Math.round(zData.total_duration_sec % 60);
+                        if (hrzonesTotalTime) {
+                            hrzonesTotalTime.textContent = `Total: ${totalM}m ${totalS}s`;
+                        }
+
+                        // Update stacked bar segments
+                        zData.zones.forEach(z => {
+                            const bar = document.getElementById(`bar-z${z.zoneNumber}`);
+                            if (bar) {
+                                bar.style.width = `${z.percentInZone || 0}%`;
+                                bar.title = `Zone ${z.zoneNumber}: ${z.percentInZone || 0}% (${z.minsInZone || 0} min)`;
+                            }
+                        });
+
+                        // Render breakdown rows from Z5 down to Z1 (Garmin standard)
+                        if (zoneBreakdownList) {
+                            zoneBreakdownList.innerHTML = '';
+                            const reversed = [...zData.zones].reverse();
+                            reversed.forEach(z => {
+                                const meta = zoneMeta.find(m => m.num === z.zoneNumber) || { name: `Zone ${z.zoneNumber}`, color: '#64748b' };
+                                const mins = Math.floor((z.secsInZone || 0) / 60);
+                                const secs = Math.round((z.secsInZone || 0) % 60);
+                                const timeStr = `${mins}m ${String(secs).padStart(2, '0')}s`;
+                                const pctStr = `${z.percentInZone || 0}%`;
+                                const bpmStr = z.zoneLowBoundary ? `≥ ${z.zoneLowBoundary} bpm` : '';
+
+                                const row = document.createElement('div');
+                                row.className = 'zone-row';
+                                row.innerHTML = `
+                                    <span class="zone-chip zone-chip--z${z.zoneNumber}">Z${z.zoneNumber}</span>
+                                    <div class="zone-label-col">
+                                        <span class="zone-name-text">${meta.name}</span>
+                                        <span class="zone-range-text">${bpmStr}</span>
+                                    </div>
+                                    <div class="zone-mini-track">
+                                        <div class="zone-mini-fill zone-bar-segment--z${z.zoneNumber}" style="width: ${z.percentInZone || 0}%;"></div>
+                                    </div>
+                                    <div class="zone-stats-col">
+                                        <span class="zone-time-val">${timeStr}</span>
+                                        <span class="zone-pct-val">${pctStr}</span>
+                                    </div>
+                                `;
+                                zoneBreakdownList.appendChild(row);
+                            });
+                        }
+                    }
+                }
+            } catch (zErr) {
+                console.debug('Could not load activity HR zones:', zErr);
             }
         } catch (err) {
             console.error('Failed to load activity details:', err);

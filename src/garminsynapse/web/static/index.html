@@ -579,6 +579,29 @@
                 </div>
             </div>
             
+            <!-- Heart Rate Zones Breakdown -->
+            <div class="modal-hrzones-section hidden" id="hrzones-container">
+                <div class="hrzones-header">
+                    <h3 class="hrzones-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        Heart Rate Zones
+                    </h3>
+                    <span class="hrzones-total-badge" id="hrzones-total-time">--</span>
+                </div>
+                
+                <div class="zone-stacked-bar" id="zone-stacked-bar" role="meter" aria-label="Heart rate zone distribution">
+                    <div class="zone-bar-segment zone-bar-segment--z1" id="bar-z1" style="width: 0%;" title="Zone 1 Warm Up"></div>
+                    <div class="zone-bar-segment zone-bar-segment--z2" id="bar-z2" style="width: 0%;" title="Zone 2 Easy"></div>
+                    <div class="zone-bar-segment zone-bar-segment--z3" id="bar-z3" style="width: 0%;" title="Zone 3 Aerobic"></div>
+                    <div class="zone-bar-segment zone-bar-segment--z4" id="bar-z4" style="width: 0%;" title="Zone 4 Threshold"></div>
+                    <div class="zone-bar-segment zone-bar-segment--z5" id="bar-z5" style="width: 0%;" title="Zone 5 Maximum"></div>
+                </div>
+
+                <div class="zone-breakdown-list" id="zone-breakdown-list">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
             <div class="modal-splits-section" id="splits-container">
                 <h3 class="splits-title">Splits / Laps</h3>
                 <div class="table-container">
@@ -898,6 +921,12 @@
                             <span class="card-title" id="hr-card-title">Resting HR</span>
                         </div>
                         <div class="metric-value" id="hr-value">-- <span class="unit">bpm</span></div>
+                        <div class="hr-range-pill hidden" id="hr-range-pill">
+                            <span class="hr-range-item"><span class="hr-range-dot hr-range-dot--min"></span>Min <b id="hr-min-val" class="font-mono">--</b></span>
+                            <span class="hr-range-sep">•</span>
+                            <span class="hr-range-item"><span class="hr-range-dot hr-range-dot--max"></span>Max <b id="hr-max-val" class="font-mono">--</b></span>
+                            <span class="unit-xs">bpm</span>
+                        </div>
                         <span class="metric-subtext" id="hr-subtext">Resting Heart Rate</span>
                     </div>
 
@@ -997,7 +1026,7 @@
                                 <th>Date & Time</th>
                                 <th>Duration</th>
                                 <th>Distance</th>
-                                <th>Avg HR</th>
+                                <th>HR (Avg / Max)</th>
                                 <th>Calories</th>
                                 <th>Status</th>
                             </tr>
@@ -1010,9 +1039,9 @@
         </main>
 
         <footer class="app-footer">
-            <span>GarminSynapse v0.4.3 (Health Engine & MCP Server)</span>
+            <span>GarminSynapse v0.4.4 (Health Engine & MCP Server)</span>
         </footer>
     </div>
-    <script src="/js/app.js?v=0.4.3"></script>
+    <script src="/js/app.js?v=0.4.4"></script>
 </body>
 </html>
