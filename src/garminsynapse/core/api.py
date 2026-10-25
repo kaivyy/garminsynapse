@@ -336,7 +336,7 @@ class GarminAPI:
         if use_cache and export_path.exists():
             try:
                 cached_bytes = export_path.read_bytes()
-                if len(cached_bytes) > 100 and (b"<gpx" in cached_bytes or b"<?xml" in cached_bytes):
+                if len(cached_bytes) > 100 and (b"<trkpt" in cached_bytes or b"<rtept" in cached_bytes):
                     return cached_bytes
             except Exception as e:
                 logger.warning(f"Error reading cached GPX file {export_path}: {e}")
@@ -365,7 +365,7 @@ class GarminAPI:
         # Validate that the response is actually GPX/XML and contains tracks or trackpoints
         if raw_bytes and (b"<gpx" in raw_bytes or b"<?xml" in raw_bytes):
             # Check for non-GPS indicator or HTML error pages
-            if b"<html" in raw_bytes.lower() or (b"<trkpt" not in raw_bytes and b"<trk" not in raw_bytes and b"<rtept" not in raw_bytes):
+            if b"<html" in raw_bytes.lower() or (b"<trkpt" not in raw_bytes and b"<rtept" not in raw_bytes):
                 logger.info(f"Activity {activity_id} has no GPS trackpoints.")
                 return b""
 

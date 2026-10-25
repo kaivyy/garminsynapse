@@ -188,7 +188,7 @@ In **Editor Settings** -> **Model Context Protocol (MCP)** -> **Add New Command*
 
 ---
 
-## 🛠️ MCP Tools Reference (30 Native AI Tools)
+## 🛠️ MCP Tools Reference (31 Native AI Tools)
 
 | Tool Name | Parameters | Description |
 |---|---|---|
@@ -223,6 +223,7 @@ In **Editor Settings** -> **Model Context Protocol (MCP)** -> **Add New Command*
 | `get_activity_weather` | `activity_id` | Get weather conditions during workout (temperature, humidity, wind) |
 | `get_activity_exercise_sets` | `activity_id` | Get gym/strength workout sets, exercise names, reps, and weights (kg) |
 | `download_fit_file` | `activity_id` | Download raw binary `.FIT` file to local storage |
+| `export_activity_gpx` | `activity_id`, `output_dir` (opt) | Export workout route to standard `.GPX` with GPS, elevation, HR & cadence |
 | **Body & Health Composition** | | |
 | `get_body_composition` | `date_str` (optional) | Get user weight (kg), BMI, body fat %, muscle mass, water %, and bone mass |
 | **Universal Query & Power Tools** | | |
@@ -253,6 +254,7 @@ In **Editor Settings** -> **Model Context Protocol (MCP)** -> **Add New Command*
 | `GET` | `/api/v1/activity/{id}` | Single activity full details |
 | `GET` | `/api/v1/activities/{id}/splits` | Per-km / per-lap workout splits |
 | `GET` | `/api/v1/activities/{id}/hr-zones` | Time and percentage spent in Zone 1–5 for workout |
+| `GET` | `/api/v1/activities/{id}/export/gpx` | Download activity GPX route file with GPS, elevation, HR & cadence |
 | `POST` | `/api/v1/sync` | Trigger manual data extraction (with 5-minute cooldown) |
 
 ---
@@ -262,6 +264,9 @@ In **Editor Settings** -> **Model Context Protocol (MCP)** -> **Add New Command*
 ```bash
 # Start web dashboard
 garminsynapse start-server [--host 0.0.0.0] [--port 6060]
+
+# Export workout to GPX file (GPS, elevation, HR & cadence)
+garminsynapse export <activity_id> [--output ./] [--format gpx]
 
 # Sync Garmin data
 garminsynapse sync --email you@mail.com --password yourpass [--days 7]
