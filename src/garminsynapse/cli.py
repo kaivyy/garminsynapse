@@ -82,5 +82,57 @@ def prune(days_keep):
     click.echo(f"✂️ Pruned {count} activity records older than {days_keep} days.")
 
 
+@cli.command()
+@click.argument("activity_id", type=int)
+@click.option("--output", "-o", default=None, help="Output directory or file path for the exported file.")
+@click.option("--format", "-f", "export_format", default="gpx", type=click.Choice(["gpx"], case_sensitive=False), help="Export format (default: gpx).")
+def export(activity_id, output, export_format):
+    """Export workout activity to a GPS exchange file (GPX)."""
+    import re
+    from pathlib import Path
+    from garminsynapse.core.api import GarminAPI
+    from garminsynapse.db.manager import DatabaseManager
+    from garminsynapse.db.schema import Activity
+
+    click.echo(f"📥 Exporting activity {activity_id} ({export_format.upper()})...")
+    api = GarminAPI()
+    gpx_bytes = api.download_activity_gpx(activity_id)
+
+    if not gpx_bytes:
+        click.echo(f"⚠️ Activity {activity_id} does not contain GPS track data or export failed.", err=True)
+        raise SystemExit(1)
+
+    act_name = "activity"
+    try:
+        db = DatabaseManager()
+        session = db.get_session()
+        try:
+            act = session.query(Activity).filter_by(activity_id=activity_id).first()
+            if act and act.activity_name:
+                clean_name = re.sub(r"[^\w\-_]", "_", act.activity_name).strip("_")
+                if clean_name:
+                    act_name = clean_name
+        finally:
+            session.close()
+    except Exception:
+        pass
+
+    filename = f"{act_name}_{activity_id}.{export_format.lower()}"
+    if output:
+        out_path = Path(output)
+        if out_path.is_dir() or output.endswith("/") or output.endswith("\\") or not out_path.suffix:
+            out_path.mkdir(parents=True, exist_ok=True)
+            target_file = out_path / filename
+        else:
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            target_file = out_path
+    else:
+        target_file = Path.cwd() / filename
+
+    target_file.write_bytes(gpx_bytes)
+    size_kb = len(gpx_bytes) / 1024
+    click.echo(f"✅ Exported activity {activity_id} to {target_file} ({size_kb:.1f} KB)")
+
+
 if __name__ == "__main__":
     cli()
