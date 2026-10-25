@@ -1,5 +1,6 @@
 """Full Garmin Connect API Wrapper wrapping 180+ endpoints from python-garminconnect."""
 import logging
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 import functools
 import requests
@@ -13,6 +14,8 @@ except ImportError:
 from garminsynapse.auth.tokens import TokenManager
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_EXPORTS_DIR = Path.cwd() / "garmin_files" / "exports"
 
 
 def with_auto_retry(func):
@@ -325,3 +328,52 @@ class GarminAPI:
         url = f"{self.base_url}/download-service/files/activity/{activity_id}"
         resp = self.session.get(url)
         return resp.content if resp.status_code == 200 else b""
+
+    @with_auto_retry
+    def download_activity_gpx(self, activity_id: int, use_cache: bool = True) -> bytes:
+        """Download activity as GPX XML format with disk caching."""
+        export_path = DEFAULT_EXPORTS_DIR / f"{activity_id}.gpx"
+        if use_cache and export_path.exists():
+            try:
+                cached_bytes = export_path.read_bytes()
+                if len(cached_bytes) > 100 and (b"<gpx" in cached_bytes or b"<?xml" in cached_bytes):
+                    return cached_bytes
+            except Exception as e:
+                logger.warning(f"Error reading cached GPX file {export_path}: {e}")
+
+        raw_bytes = b""
+        if self._garmin_instance:
+            try:
+                raw_bytes = self._garmin_instance.download_activity(
+                    str(activity_id),
+                    dl_fmt=self._garmin_instance.ActivityDownloadFormat.GPX
+                )
+            except Exception as e:
+                logger.error(f"Failed to download GPX via garminconnect: {e}")
+                raw_bytes = b""
+
+        if not raw_bytes:
+            url = f"{self.base_url}/download-service/export/gpx/activity/{activity_id}"
+            try:
+                resp = self.session.get(url)
+                if resp.status_code == 200:
+                    raw_bytes = resp.content
+            except Exception as e:
+                logger.error(f"Failed to download GPX via HTTP: {e}")
+                raw_bytes = b""
+
+        # Validate that the response is actually GPX/XML and contains tracks or trackpoints
+        if raw_bytes and (b"<gpx" in raw_bytes or b"<?xml" in raw_bytes):
+            # Check for non-GPS indicator or HTML error pages
+            if b"<html" in raw_bytes.lower() or (b"<trkpt" not in raw_bytes and b"<trk" not in raw_bytes and b"<rtept" not in raw_bytes):
+                logger.info(f"Activity {activity_id} has no GPS trackpoints.")
+                return b""
+
+            try:
+                DEFAULT_EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+                export_path.write_bytes(raw_bytes)
+            except Exception as e:
+                logger.warning(f"Failed to save GPX cache to {export_path}: {e}")
+            return raw_bytes
+
+        return b""
