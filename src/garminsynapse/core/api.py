@@ -15,7 +15,12 @@ from garminsynapse.auth.tokens import TokenManager
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_EXPORTS_DIR = Path.cwd() / "garmin_files" / "exports"
+_PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_EXPORTS_DIR = (
+    Path.cwd() / "garmin_files" / "exports"
+    if (Path.cwd() / "garmin_files" / "exports").exists()
+    else _PACKAGE_ROOT / "garmin_files" / "exports"
+)
 
 
 def with_auto_retry(func):

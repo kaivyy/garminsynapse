@@ -10,7 +10,12 @@ from garminsynapse.db.schema import User, UserProfile, Activity, ActivityTsMetri
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_INGEST_DIR = Path.cwd() / "garmin_files" / "ingest"
+_PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_INGEST_DIR = (
+    Path.cwd() / "garmin_files" / "ingest"
+    if (Path.cwd() / "garmin_files" / "ingest").exists()
+    else _PACKAGE_ROOT / "garmin_files" / "ingest"
+)
 DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 
@@ -179,7 +184,7 @@ class GarminProcessor:
                 existing = session.query(DailySummary).filter_by(user_id=user_id, calendar_date=parsed_date).first()
                 steps = data.get("totalSteps")
                 step_goal = data.get("dailyStepGoal", 10000)
-                dist = data.get("totalDistance")
+                dist = data.get("totalDistanceMeters") or data.get("totalDistance")
                 rhr = data.get("restingHeartRate")
                 min_hr = data.get("minHeartRate")
                 max_hr = data.get("maxHeartRate")

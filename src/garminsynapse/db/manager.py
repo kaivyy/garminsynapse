@@ -1,5 +1,6 @@
 """Database Manager handling SQLite connections, DDL creation, downsampling, and pruning."""
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 from sqlalchemy import create_engine, text
@@ -9,7 +10,10 @@ from garminsynapse.db.schema import Base
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path.cwd() / "garmin_data.db"
+_PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_DB_PATH = Path(os.environ.get("GARMIN_DB_PATH")) if os.environ.get("GARMIN_DB_PATH") else (
+    Path.cwd() / "garmin_data.db" if (Path.cwd() / "garmin_data.db").exists() else _PACKAGE_ROOT / "garmin_data.db"
+)
 
 
 class DatabaseManager:

@@ -554,7 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 activityTableBody.innerHTML = '';
 
                 if (activities.length === 0) {
-                    activityTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:40px; font-size:14px;">No device connected: no workouts logged for the selected range.</td></tr>`;
+                    activityTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:40px; font-size:14px;">No workouts logged for the selected range.</td></tr>`;
                     return;
                 }
 

@@ -9,7 +9,12 @@ from garminsynapse.core.api import GarminAPI
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_INGEST_DIR = Path.cwd() / "garmin_files" / "ingest"
+_PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_INGEST_DIR = (
+    Path.cwd() / "garmin_files" / "ingest"
+    if (Path.cwd() / "garmin_files" / "ingest").exists()
+    else _PACKAGE_ROOT / "garmin_files" / "ingest"
+)
 
 
 class GarminExtractor:
