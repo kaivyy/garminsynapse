@@ -632,3 +632,53 @@ def garmin_raw_api(endpoint_path: str, params: Optional[Dict[str, Any]] = None) 
         return {"status": "error", "endpoint": endpoint_path, "message": str(e)}
 
 
+@mcp.tool()
+def export_activity_gpx(activity_id: int, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    """Export a workout activity as a GPX XML file (with GPS coordinates, elevation, and timestamps)."""
+    import re
+    from pathlib import Path
+    from garminsynapse.core.api import GarminAPI, DEFAULT_EXPORTS_DIR
+    from garminsynapse.db.manager import DatabaseManager
+    from garminsynapse.db.schema import Activity
+
+    api = GarminAPI()
+    gpx_bytes = api.download_activity_gpx(activity_id)
+    if not gpx_bytes:
+        return {
+            "status": "no_gps_data",
+            "activity_id": activity_id,
+            "has_gps_data": False,
+            "message": f"Activity {activity_id} does not contain GPS track data or GPX generation failed."
+        }
+
+    act_name = "activity"
+    try:
+        db = DatabaseManager()
+        session = db.get_session()
+        try:
+            act = session.query(Activity).filter_by(activity_id=activity_id).first()
+            if act and act.activity_name:
+                clean_name = re.sub(r"[^\w\-_]", "_", act.activity_name).strip("_")
+                if clean_name:
+                    act_name = clean_name
+        finally:
+            session.close()
+    except Exception:
+        pass
+
+    target_dir = Path(output_dir) if output_dir else DEFAULT_EXPORTS_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_file = target_dir / f"{act_name}_{activity_id}.gpx"
+    target_file.write_bytes(gpx_bytes)
+
+    return {
+        "status": "success",
+        "activity_id": activity_id,
+        "activity_name": act_name,
+        "file_path": str(target_file.resolve()),
+        "file_size_bytes": len(gpx_bytes),
+        "has_gps_data": True,
+        "message": f"Exported activity {activity_id} to {target_file.name} ({len(gpx_bytes)} bytes)."
+    }
+
+
