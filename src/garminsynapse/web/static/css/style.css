@@ -1074,6 +1074,99 @@ h1, h2, h3 {
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
+.modal-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-export-gpx {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(14, 165, 233, 0.12);
+    border: 1px solid rgba(14, 165, 233, 0.35);
+    color: var(--accent-blue);
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-export-gpx:hover {
+    background: rgba(14, 165, 233, 0.22);
+    border-color: var(--accent-blue);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.25);
+}
+
+.btn-export-gpx:active {
+    transform: translateY(1px);
+}
+
+.btn-export-gpx:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 1px;
+}
+
+.btn-export-gpx:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border-subtle);
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+}
+
+.spin-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.app-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+}
+
+.app-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.app-toast--warn {
+    border-color: rgba(245, 158, 11, 0.4);
+    color: #fbbf24;
+}
+
+.app-toast--error {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #f87171;
+}
+
+.app-toast--success {
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #34d399;
+}
+
 .close-btn {
     background: var(--bg-secondary);
     border: 1px solid var(--border-subtle);

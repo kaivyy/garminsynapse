@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtn = document.getElementById('logout-btn');
     const syncBtn = document.getElementById('sync-btn');
     const closeActModal = document.getElementById('close-act-modal');
+    const modalExportGpxBtn = document.getElementById('modal-export-gpx-btn');
+    let currentModalActivityId = null;
 
     const themeToggle = document.getElementById('theme-toggle');
     const themeIconSun = document.getElementById('theme-icon-sun');
@@ -579,6 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function openActivityModal(act) {
         try {
+            currentModalActivityId = act.id;
             modalActName.textContent = act.name || 'Workout Details';
             modalActType.textContent = act.type || 'Activity';
             modalActTime.textContent = act.start_ts || '--';
@@ -732,6 +735,66 @@ document.addEventListener('DOMContentLoaded', () => {
             } finally {
                 syncBtn.disabled = false;
                 syncBtn.querySelector('span').textContent = 'Sync';
+            }
+        });
+    }
+
+    function showNotification(msg, type = 'info') {
+        let toast = document.getElementById('app-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'app-toast';
+            toast.className = 'app-toast';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        toast.className = `app-toast app-toast--${type} show`;
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => {
+            toast.className = 'app-toast';
+        }, 3500);
+    }
+
+    if (modalExportGpxBtn) {
+        modalExportGpxBtn.addEventListener('click', async () => {
+            if (!currentModalActivityId) return;
+            const originalHtml = modalExportGpxBtn.innerHTML;
+            modalExportGpxBtn.disabled = true;
+            modalExportGpxBtn.innerHTML = `
+                <svg class="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="10"/></svg>
+                <span>Exporting...</span>
+            `;
+            try {
+                const res = await fetch(`/api/v1/activities/${currentModalActivityId}/export/gpx`);
+                if (res.status === 200) {
+                    const blob = await res.blob();
+                    const disposition = res.headers.get('Content-Disposition');
+                    let filename = `activity_${currentModalActivityId}.gpx`;
+                    if (disposition && disposition.includes('filename=')) {
+                        const match = disposition.match(/filename="?([^";]+)"?/);
+                        if (match && match[1]) filename = match[1];
+                    }
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                    showNotification(`Downloaded ${filename}`, 'success');
+                } else if (res.status === 422) {
+                    const errData = await res.json().catch(() => ({}));
+                    showNotification(errData.message || 'Aktivitas ini tidak memiliki data rute GPS.', 'warn');
+                } else {
+                    showNotification('Gagal mengekspor file GPX.', 'error');
+                }
+            } catch (err) {
+                console.error('GPX export failed:', err);
+                showNotification('Terjadi kesalahan jaringan saat mengekspor GPX.', 'error');
+            } finally {
+                modalExportGpxBtn.disabled = false;
+                modalExportGpxBtn.innerHTML = originalHtml;
             }
         });
     }
