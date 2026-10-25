@@ -1,8 +1,9 @@
 """FastAPI REST API routes for Garmin Synapse Web Dashboard."""
 import logging
+import re
 from datetime import datetime, date
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -674,6 +675,56 @@ def get_activity_splits_route(activity_id: int):
         logger.error(f"Error fetching splits for activity {activity_id}: {e}")
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/activities/{activity_id}/export/gpx")
+def export_activity_gpx_route(activity_id: int):
+    """Export and download activity GPX file with GPS track data."""
+    auth_mgr = DualAuthManager()
+    tokens = auth_mgr.get_active_tokens(auto_refresh=True)
+    if not tokens:
+        return JSONResponse({"error": "unauthenticated"}, status_code=401)
+
+    headers = tokens.get("headers", {})
+    if not headers:
+        if "access_token" in tokens:
+            headers["Authorization"] = f"Bearer {tokens['access_token']}"
+        elif "cookies" in tokens:
+            headers["Cookie"] = "; ".join([f"{k}={v}" for k, v in tokens["cookies"].items()])
+
+    api = GarminAPI(session_headers=headers)
+    gpx_bytes = api.download_activity_gpx(activity_id)
+    if not gpx_bytes:
+        return JSONResponse(
+            {
+                "error": "no_gps_data",
+                "message": "Activity does not contain GPS track data (e.g. indoor/strength workout) or GPX generation failed."
+            },
+            status_code=422
+        )
+
+    filename = f"activity_{activity_id}.gpx"
+    try:
+        db = DatabaseManager()
+        session = db.get_session()
+        try:
+            act = session.query(Activity).filter_by(activity_id=activity_id).first()
+            if act and act.activity_name:
+                clean_name = re.sub(r"[^\w\-_]", "_", act.activity_name).strip("_")
+                if clean_name:
+                    filename = f"{clean_name}_{activity_id}.gpx"
+        finally:
+            session.close()
+    except Exception as e:
+        logger.debug(f"Failed to lookup activity name for filename: {e}")
+
+    return Response(
+        content=gpx_bytes,
+        media_type="application/gpx+xml",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
 
 
 @router.get("/hr-zones")
